@@ -83,7 +83,7 @@ def main():
  
     ticker_company_dict = get_sp500_tickers()
 
-    input_col.header("Portfoliu")
+    input_col.header("Portofoliu")
 
     selected_tickers = input_col.multiselect("Selectați tipurile de acțiuni din portofoliul dvs.:", list(ticker_company_dict.keys()), format_func=lambda ticker: f"{ticker}: {ticker_company_dict[ticker]}")
 
