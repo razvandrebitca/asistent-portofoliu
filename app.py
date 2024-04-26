@@ -70,11 +70,11 @@ def main():
     st.subheader("Descriere")
     st.info(
             "Această aplicație folosește algoritmul lui Markowitz pentru a optimiza portofolii ce conțin acțiuni S&P 500, folosind date istorice de tranzacționare a indexului S&P 500.\n"
-)
+        )
     st.markdown("---")
 
     input_col = st.sidebar
-    input_col.header("Selectare interval de timp pentru analiză")
+    input_col.header("Selectare interval de timp pentru instoricul de tranzacționare")
 
     
     start_date = input_col.date_input("Dată început:", dt.datetime(2020, 1, 1))
@@ -88,7 +88,7 @@ def main():
     selected_tickers = input_col.multiselect("Selectați tipurile de acțiuni din portofoliul dvs.:", list(ticker_company_dict.keys()), format_func=lambda ticker: f"{ticker}: {ticker_company_dict[ticker]}")
 
   
-    portfolio_amount = input_col.number_input("Introduceți suma investită în portfoliu:", min_value=10.0, step=1000.0, value=100.0, format="%.2f")
+    portfolio_amount = input_col.number_input("Introduceți suma investită în portfoliu:", min_value=1000.0, step=1000.0, value=1000.0, format="%.2f")
 
    
     if input_col.button("Optimizare"):
