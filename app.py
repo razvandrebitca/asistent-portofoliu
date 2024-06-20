@@ -22,6 +22,12 @@ def get_sp500_tickers():
     ticker_company_dict = dict(zip(tickers, company_names))
     return ticker_company_dict
 
+def get_btc_price(start_date, end_date):
+   btc_data = yf.download('BTC-USD',start=start_date,end=end_date)
+   btc_price = btc_data['Adj Close']
+   return btc_price  
+
+
 # Obținere istoric prețuri pt. S&P 500
 def get_sp500_prices(start_date, end_date):
     sp500_data = yf.download('^GSPC', start=start_date, end=end_date)
@@ -63,7 +69,6 @@ def main():
   
     st.set_page_config(page_title="Asistent Virtual pentru Analiza Portofoliului")
 
- 
     st.title("Asistent Virtual pentru Analiza Portofoliului")
     
     st.markdown("---")
@@ -85,13 +90,14 @@ def main():
 
     input_col.header("Portofoliu")
 
-    selected_tickers = input_col.multiselect("Selectați tipurile de acțiuni din portofoliul dvs.:", list(ticker_company_dict.keys()), format_func=lambda ticker: f"{ticker}: {ticker_company_dict[ticker]}")
+    selected_tickers = input_col.multiselect("Selectați tipurile de acțiuni S&P 500 din portofoliul dvs.:", list(ticker_company_dict.keys()), format_func=lambda ticker: f"{ticker}: {ticker_company_dict[ticker]}")
 
   
     portfolio_amount = input_col.number_input("Introduceți suma investită în portfoliu:", min_value=1000.0, step=1000.0, value=1000.0, format="%.2f")
-
+    
    
-    if input_col.button("Optimizare"):
+    
+    if input_col.button("Optimizare portofoliu acțiuni"):
         if len(selected_tickers) < 2:
             st.warning("Trebuie selectate cel puțin 2 tipuri de active.")
         else:
@@ -167,5 +173,82 @@ def main():
             st.dataframe(df_info)
 
 
+    selected_pairs = input_col.multiselect('Alegeți criptomonede:',['BTC-USD', 'ETH-USD', 'ADA-USD', 'DOGE-USD', 'SOL-USD', 'LTC-USD'])
+    crypto_amount = input_col.number_input("Introduceți suma investită în criptomonede:", min_value=1000.0, step=1000.0, value=1000.0, format="%.2f")
+    
+    if input_col.button("Optimizare portofoliu criptomonede"):
+        if len(selected_pairs) < 2:
+            st.warning("Trebuie selectate cel puțin 2 tipuri de criptomonede.")
+        else:
+            my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover = optimize_portfolio(selected_pairs, start_date, end_date, crypto_amount)
+            df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
+            df_allocation['Preț acțiune'] = '$' + latest_price.round(2).astype(str)
+            df_allocation['Cost'] = '$' + (df_allocation['Shares'] * latest_price).round(2).astype(str)
+            col1, col2 = st.columns([2, 2.5])
+
+           
+            with col1:
+                st.write("Fonduri alocate:")
+                st.dataframe(df_allocation)
+                st.write("Fonduri rămase: ${:.2f}".format(leftover))
+
+           
+            with col2:
+                st.write("Compoziție portofoliu criptomonede optimizat:")
+                
+                colors = sns.color_palette('Set3', len(df_allocation))
+
+               
+                explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
+
+               
+                plt.figure(figsize=(8,8))
+                plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
+                plt.axis('equal')
+
+                st.pyplot(plt)
+                
+            
+            btc_prices = get_btc_price(start_date, end_date)
+
+            
+            btc_returns = btc_prices.pct_change().dropna()
+
+            
+            my_portfolio_returns_array = my_portfolio_returns.values
+            cleaned_weights_array = np.array(list(cleaned_weights.values()))
+
+            
+            portfolio_returns = np.dot(my_portfolio_returns_array, cleaned_weights_array)
+
+           
+            btc_expected_returns = btc_returns.mean() * 252 
+            btc_volatility = btc_returns.std() * np.sqrt(252)
+            portfolio_expected_returns = portfolio_returns.mean() * 252
+            portfolio_volatility = portfolio_returns.std() * np.sqrt(252)
+
+          
+            combined_returns = pd.DataFrame({'BTC-USD': btc_returns, 'Portfoliu dvs.': portfolio_returns}, index=my_portfolio_returns.index)
+
+        
+            plt.figure(figsize=(12, 6))
+            plt.plot(combined_returns.index, 100 * (combined_returns + 1).cumprod(), lw=2)
+            plt.legend(combined_returns.columns)
+            plt.xlabel('Dată')
+            plt.ylabel('Rentabilitatea cumulativă (%)')
+            plt.title('BTC-USD vs. Portofoliu optimizat')
+            plt.grid(True)
+            plt.tight_layout()     
+            st.pyplot(plt)
+            df_info = pd.DataFrame({
+                'BTC-USD': ['{:.2f}%'.format(100 * btc_expected_returns), '{:.2f}%'.format(100 * btc_volatility)],
+                'Portfoliu': ['{:.2f}%'.format(100 * portfolio_expected_returns), '{:.2f}%'.format(100 * portfolio_volatility)]
+            }, index=['Profit așteptat', 'Volatilitate'])
+
+            st.dataframe(df_info)
+    
+        
+   
+            
 if __name__ == "__main__":
     main()
