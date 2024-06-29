@@ -186,7 +186,7 @@ def main():
 
 
     selected_pairs = input_col.multiselect('Alegeți criptomonede:',['BTC-USD', 'ETH-USD', 'ADA-USD', 'DOGE-USD', 'SOL-USD', 'LTC-USD'])
-    crypto_amount = input_col.number_input("Introduceți suma investită în criptomonede:", min_value=1000.0, step=1000.0, value=1000.0, format="%.2f")
+    crypto_amount = input_col.number_input("Introduceți suma investită în criptomonede:", min_value=1000.0, step=1000.0, value=70000.0, format="%.2f")
     
     if input_col.button("Optimizare portofoliu criptomonede"):
         if len(selected_pairs) < 2:
@@ -262,7 +262,7 @@ def main():
     typed_stocks = input_col.text_input(
     label="Introduceți acțiunile separate de virgulă (,)",
     placeholder="voo, vwra.l, qqq, gbug, spbo",
-    help="Numele acțiunilor se pot găsii pe yahoofinance.com.")
+    help="Numele acțiunilor se pot găsi pe yahoofinance.com.")
     typed_amount = input_col.number_input("Introduceți suma investită în portfoliu:", min_value=1000.0, step=1000.0, value=1500.0, format="%.2f")
     stocks_split = [s.strip() for s in typed_stocks.split(",") if s.strip()]
     if input_col.button("Optimizare portofoliu acțiuni propriu"):
