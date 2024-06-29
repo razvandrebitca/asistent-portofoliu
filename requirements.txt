@@ -5,4 +5,4 @@ yfinance
 matplotlib
 seaborn
 pyportfolioopt
-sklearn
+scikit-learn
