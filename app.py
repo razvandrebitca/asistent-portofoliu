@@ -5,15 +5,22 @@ import yfinance as yf
 import datetime as dt
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pickle
+from pathlib import Path
+import streamlit_authenticator as stauth
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import risk_models
 from pypfopt import expected_returns
 from pypfopt import objective_functions
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
+from login import login, register, logout, is_logged_in, initialize_session_state
 
-# Funcție pentru a prelua toate companiile din S&P 500 de pe wikipedia
+st.set_page_config(page_title="Portfolio Analysis Assistant", layout="wide")
+
+
+
+# Function to retrieve S&P 500 tickers from Wikipedia
 def get_sp500_tickers():
-  
     url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
     data = pd.read_html(url)
     table = data[0]
@@ -22,323 +29,221 @@ def get_sp500_tickers():
     ticker_company_dict = dict(zip(tickers, company_names))
     return ticker_company_dict
 
-def get_btc_price(start_date, end_date):
-   btc_data = yf.download('BTC-USD',start=start_date,end=end_date)
-   btc_price = btc_data['Adj Close']
-   return btc_price  
+# Function to retrieve cryptocurrency price data
+def get_crypto_prices(crypto_symbols, start_date, end_date):
+    crypto_data = {}
+    for symbol in crypto_symbols:
+        crypto_data[symbol] = yf.download(symbol + '-USD', start=start_date, end=end_date)['Adj Close']
+    return pd.DataFrame(crypto_data)
 
-
-# Obținere istoric prețuri pt. S&P 500
+# Function to retrieve S&P 500 price data
 def get_sp500_prices(start_date, end_date):
     sp500_data = yf.download('^GSPC', start=start_date, end=end_date)
     sp500_prices = sp500_data['Adj Close']
     return sp500_prices
 
-# Funcție pentru optimizarea portofoliului folosind frontiera Markowitz
-def optimize_portfolio(selected_tickers, start_date, end_date, portfolio_amount):
-    n = len(selected_tickers)
-    
-   
+# Function to optimize portfolio using Markowitz efficient frontier
+def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount):
     my_portfolio = pd.DataFrame()
-    for ticker in selected_tickers:
-        my_portfolio[ticker] = yf.download(ticker, start=start_date, end=end_date)['Adj Close']
-    
-
+    for asset in selected_assets:
+        my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date)['Adj Close']
     
     my_portfolio_returns = my_portfolio.pct_change().dropna()
-
-    
     mu = expected_returns.mean_historical_return(my_portfolio)
     S = risk_models.sample_cov(my_portfolio)
     
-   
     ef = EfficientFrontier(mu, S)
     ef.add_objective(objective_functions.L2_reg, gamma=2)
     weights = ef.max_sharpe()
     cleaned_weights = ef.clean_weights()
     
     latest_prices = get_latest_prices(my_portfolio)
-    
-   
     da = DiscreteAllocation(cleaned_weights, latest_prices, total_portfolio_value=portfolio_amount)
     allocation, leftover = da.lp_portfolio()
     
-    return my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover
+    return my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover
 
+# Function to calculate performance metrics
+def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate=0.01):
+    portfolio_returns = pd.Series(portfolio_returns)  # Convert to Pandas Series
+    sharpe_ratio = (portfolio_returns.mean() - risk_free_rate) / portfolio_returns.std() * np.sqrt(252)
+    sortino_ratio = (portfolio_returns.mean() - risk_free_rate) / portfolio_returns[portfolio_returns < 0].std() * np.sqrt(252)
+    cumulative_returns = (1 + portfolio_returns).cumprod()
+    peak = cumulative_returns.cummax()
+    drawdown = (cumulative_returns - peak) / peak
+    max_drawdown = drawdown.min()
+    
+    # Calculate Beta and Treynor Ratio
+    beta = np.cov(portfolio_returns, benchmark_returns)[0, 1] / np.var(benchmark_returns)
+    treynor_ratio = (portfolio_returns.mean() - risk_free_rate) / beta
+    
+    return sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio
+
+
+
+# Main function for the Streamlit app
 def main():
-    
-    st.set_page_config(page_title="Asistent Virtual pentru Analiza Portofoliului",layout="wide")
-    st.markdown(""" <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    </style> """, unsafe_allow_html=True)
-    padding = 0
-    st.markdown(f""" <style>
-    .reportview-container .main .block-container{{
-        padding-top: {padding}rem;
-        padding-right: {padding}rem;
-        padding-left: {padding}rem;
-        padding-bottom: {padding}rem;
-    }} </style> """, unsafe_allow_html=True)
-    
-    st.title("Asistent Virtual pentru Analiza Portofoliului")
-    
-    st.markdown("---")
-    st.subheader("Descriere")
-    st.info(
-            "Această aplicație folosește algoritmul lui Markowitz pentru a optimiza portofolii ce conțin acțiuni S&P 500, folosind date istorice de tranzacționare a indexului S&P 500.\n"
-        )
-    st.markdown("---")
-
-    input_col = st.sidebar
-    input_col.header("Selectare interval de timp pentru instoricul de tranzacționare")
-
-    
-    start_date = input_col.date_input("Dată început:", dt.datetime(2020, 1, 1))
-    end_date = input_col.date_input("Dată sfârșit:", dt.datetime.now())
-
+ names = ["John Doe","Peter Miller"]
+ usernames =["john","peter"]
+ passwords=["abc123","test1234"]
  
-    ticker_company_dict = get_sp500_tickers()
-
-    input_col.header("Portofoliu")
-
-    selected_tickers = input_col.multiselect("Selectați tipurile de acțiuni S&P 500 din portofoliul dvs.:", list(ticker_company_dict.keys()), format_func=lambda ticker: f"{ticker}: {ticker_company_dict[ticker]}")
-
-  
-    portfolio_amount = input_col.number_input("Introduceți suma investită în portfoliu:", min_value=1000.0, step=1000.0, value=1000.0, format="%.2f")
+ file_path= Path(__file__).parent / "hashed_pw.pk1"
+ with file_path.open("rb") as file:
+    hashed_passwords = pickle.load(file)   
+ credentials = {
+        "usernames":{
+            usernames[0]:{
+                "name":names[0],
+                "password":hashed_passwords[0]
+                },
+            usernames[1]:{
+                "name":names[1],
+                "password":hashed_passwords[1]
+                }            
+            }
+        }   
+ authenticator = stauth.Authenticate(credentials,"app_home","auth",cookie_expiry_days=30)
+ name, authentification_status, username = authenticator.login('main', fields = {'Form name': 'Login'})
     
+ if authentification_status == False:
+        st.error("Invalid username or password")
    
-    
-    if input_col.button("Optimizare portofoliu acțiuni"):
-        if len(selected_tickers) < 2:
-            st.warning("Trebuie selectate cel puțin 2 tipuri de active.")
-        else:
-            my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover = optimize_portfolio(selected_tickers, start_date, end_date, portfolio_amount)
-            
-     
-            df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
-            df_allocation['Preț acțiune'] = '$' + latest_price.round(2).astype(str)
-            df_allocation['Cost'] = '$' + (df_allocation['Shares'] * latest_price).round(2).astype(str)
-    
-           
-            col1, col2 = st.columns([2, 2.5])
+ if authentification_status:
+        # Once logged in, render the main application content
+        authenticator.logout("Logout","sidebar")
+        st.sidebar.title(f"Welcome, {name}!")      
+        st.markdown(""" <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        </style> """, unsafe_allow_html=True)
 
-           
-            with col1:
-                st.write("Fonduri alocate:")
-                st.dataframe(df_allocation)
-                st.write("Fonduri rămase: ${:.2f}".format(leftover))
+        st.title("Portfolio Analysis Assistant")
 
-           
-            with col2:
-                st.write("Compoziție portofoliu optimizat:")
+        st.markdown("---")
+        st.subheader("Description")
+        st.info(
+            "This app uses Markowitz's algorithm to optimize portfolios containing S&P 500 stocks and cryptocurrencies, "
+            "using historical trading data."
+        )
+        st.markdown("---")
+
+        input_col = st.sidebar
+        input_col.header("Select Time Period for Historical Data")
+
+        start_date = input_col.date_input("Start Date:", dt.datetime(2020, 1, 1))
+        end_date = input_col.date_input("End Date:", dt.datetime.now())
+
+        ticker_company_dict = get_sp500_tickers()
+
+        input_col.header("Portfolio")
+
+        selected_tickers = input_col.multiselect(
+            "Select S&P 500 stocks for your portfolio:", 
+            list(ticker_company_dict.keys()), 
+            format_func=lambda ticker: f"{ticker}: {ticker_company_dict[ticker]}"
+        )
+
+        # Input for custom ticker symbols
+        custom_tickers = input_col.text_input("Enter custom stock tickers separated by commas (e.g., AAPL, MSFT, TSLA)")
+
+        if custom_tickers:
+            custom_tickers_list = [ticker.strip() for ticker in custom_tickers.split(',')]
+            selected_tickers.extend(custom_tickers_list)
+
+        # Input for cryptocurrencies
+        crypto_symbols = input_col.text_input("Enter cryptocurrency symbols separated by commas (e.g., BTC, ETH, ADA)")
+
+        if crypto_symbols:
+            crypto_symbols_list = [symbol.strip() for symbol in crypto_symbols.split(',')]
+            selected_tickers.extend([symbol + '-USD' for symbol in crypto_symbols_list])
+
+        portfolio_amount = input_col.number_input(
+            "Enter portfolio amount:", 
+            min_value=1000.0, 
+            step=1000.0, 
+            value=1000.0, 
+            format="%.2f"
+        )
+
+        # Risk-Free Rate Input
+        risk_free_rate = input_col.number_input(
+            "Enter risk-free rate (in %):", 
+            min_value=0.0, 
+            max_value=10.0, 
+            step=0.1, 
+            value=1.0
+        ) / 100
+
+        if input_col.button("Optimize Portfolio"):
+            if len(selected_tickers) < 2:
+                st.warning("At least 2 assets must be selected.")
+            else:
+                my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover = optimize_portfolio(selected_tickers, start_date, end_date, portfolio_amount)
+
+                df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
+                df_allocation['Price per Share'] = '$' + latest_price.round(2).astype(str)
+                df_allocation['Cost'] = '$' + (df_allocation['Shares'] * latest_price).round(2).astype(str)
+
+                col1, col2 = st.columns([2, 2.5])
+
+                with col1:
+                    st.write("Allocated Funds:")
+                    st.dataframe(df_allocation)
+                    st.write("Remaining Funds: ${:.2f}".format(leftover))
+
+                with col2:
+                    st.write("Optimized Portfolio Composition:")
+                    
+                    colors = sns.color_palette('Set3', len(df_allocation))
+                    explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
+
+                    plt.figure(figsize=(8,8))
+                    plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
+                    plt.axis('equal')
+                    st.pyplot(plt)
                 
-                colors = sns.color_palette('Set3', len(df_allocation))
+                sp500_prices = get_sp500_prices(start_date, end_date)
+                sp500_returns = sp500_prices.pct_change().dropna()
+                portfolio_returns = np.dot(my_portfolio_returns.values, np.array(list(cleaned_weights.values())))
 
-               
-                explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
+                sp500_expected_returns = sp500_returns.mean() * 252 
+                sp500_volatility = sp500_returns.std() * np.sqrt(252)
+                portfolio_expected_returns = portfolio_returns.mean() * 252
+                portfolio_volatility = portfolio_returns.std() * np.sqrt(252)
 
-               
-                plt.figure(figsize=(8,8))
-                plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
-                plt.axis('equal')
+                combined_returns = pd.DataFrame({'S&P 500': sp500_returns, 'Your Portfolio': portfolio_returns}, index=my_portfolio_returns.index)
 
+                plt.figure(figsize=(12, 6))
+                plt.plot(combined_returns.index, 100 * (combined_returns + 1).cumprod(), lw=2)
+                plt.legend(combined_returns.columns)
+                plt.xlabel('Date')
+                plt.ylabel('Cumulative Return (%)')
+                plt.title('S&P 500 vs. Optimized Portfolio')
+                plt.grid(True)
+                plt.tight_layout()     
                 st.pyplot(plt)
-            
-            
-            sp500_prices = get_sp500_prices(start_date, end_date)
 
-            
-            sp500_returns = sp500_prices.pct_change().dropna()
-
-            
-            my_portfolio_returns_array = my_portfolio_returns.values
-            cleaned_weights_array = np.array(list(cleaned_weights.values()))
-
-            
-            portfolio_returns = np.dot(my_portfolio_returns_array, cleaned_weights_array)
-
-           
-            sp500_expected_returns = sp500_returns.mean() * 252 
-            sp500_volatility = sp500_returns.std() * np.sqrt(252)
-            portfolio_expected_returns = portfolio_returns.mean() * 252
-            portfolio_volatility = portfolio_returns.std() * np.sqrt(252)
-
-          
-            combined_returns = pd.DataFrame({'S&P 500': sp500_returns, 'Portfoliu dvs.': portfolio_returns}, index=my_portfolio_returns.index)
-
-        
-            plt.figure(figsize=(12, 6))
-            plt.plot(combined_returns.index, 100 * (combined_returns + 1).cumprod(), lw=2)
-            plt.legend(combined_returns.columns)
-            plt.xlabel('Dată')
-            plt.ylabel('Rentabilitatea cumulativă (%)')
-            plt.title('S&P 500 vs. Portofoliu optimizat')
-            plt.grid(True)
-            plt.tight_layout()     
-            st.pyplot(plt)
-            df_info = pd.DataFrame({
-                'S&P 500': ['{:.2f}%'.format(100 * sp500_expected_returns), '{:.2f}%'.format(100 * sp500_volatility)],
-                'Portfoliu': ['{:.2f}%'.format(100 * portfolio_expected_returns), '{:.2f}%'.format(100 * portfolio_volatility)]
-            }, index=['Profit așteptat', 'Volatilitate'])
-
-            st.dataframe(df_info)
-
-
-    selected_pairs = input_col.multiselect('Alegeți criptomonede:',['BTC-USD', 'ETH-USD', 'ADA-USD', 'DOGE-USD', 'SOL-USD', 'LTC-USD'])
-    crypto_amount = input_col.number_input("Introduceți suma investită în criptomonede:", min_value=1000.0, step=1000.0, value=70000.0, format="%.2f")
-    
-    if input_col.button("Optimizare portofoliu criptomonede"):
-        if len(selected_pairs) < 2:
-            st.warning("Trebuie selectate cel puțin 2 tipuri de criptomonede.")
-        else:
-            my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover = optimize_portfolio(selected_pairs, start_date, end_date, crypto_amount)
-            df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
-            df_allocation['Preț acțiune'] = '$' + latest_price.round(2).astype(str)
-            df_allocation['Cost'] = '$' + (df_allocation['Shares'] * latest_price).round(2).astype(str)
-            col1, col2 = st.columns([2, 2.5])
-
-           
-            with col1:
-                st.write("Fonduri alocate:")
-                st.dataframe(df_allocation)
-                st.write("Fonduri rămase: ${:.2f}".format(leftover))
-
-           
-            with col2:
-                st.write("Compoziție portofoliu criptomonede optimizat:")
-                
-                colors = sns.color_palette('Set3', len(df_allocation))
-
-               
-                explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
-
-               
-                plt.figure(figsize=(8,8))
-                plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
-                plt.axis('equal')
-
+                # Correlation Heatmap
+                st.write("Correlation Heatmap of Selected Assets:")
+                corr_matrix = my_portfolio.corr()
+                plt.figure(figsize=(10, 8))
+                sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", linewidths=0.5)
                 st.pyplot(plt)
                 
-            
-            btc_prices = get_btc_price(start_date, end_date)
+                df_info = pd.DataFrame({
+                    'S&P 500': ['{:.2f}%'.format(100 * sp500_expected_returns), '{:.2f}%'.format(100 * sp500_volatility)],
+                    'Your Portfolio': ['{:.2f}%'.format(100 * portfolio_expected_returns), '{:.2f}%'.format(100 * portfolio_volatility)]
+                }, index=['Expected Return', 'Volatility'])
 
-            
-            btc_returns = btc_prices.pct_change().dropna()
-
-            
-            my_portfolio_returns_array = my_portfolio_returns.values
-            cleaned_weights_array = np.array(list(cleaned_weights.values()))
-
-            
-            portfolio_returns = np.dot(my_portfolio_returns_array, cleaned_weights_array)
-
-           
-            btc_expected_returns = btc_returns.mean() * 252 
-            btc_volatility = btc_returns.std() * np.sqrt(252)
-            portfolio_expected_returns = portfolio_returns.mean() * 252
-            portfolio_volatility = portfolio_returns.std() * np.sqrt(252)
-
-          
-            combined_returns = pd.DataFrame({'BTC-USD': btc_returns, 'Portfoliu dvs.': portfolio_returns}, index=my_portfolio_returns.index)
-
-        
-            plt.figure(figsize=(12, 6))
-            plt.plot(combined_returns.index, 100 * (combined_returns + 1).cumprod(), lw=2)
-            plt.legend(combined_returns.columns)
-            plt.xlabel('Dată')
-            plt.ylabel('Rentabilitatea cumulativă (%)')
-            plt.title('BTC-USD vs. Portofoliu optimizat')
-            plt.grid(True)
-            plt.tight_layout()     
-            st.pyplot(plt)
-            df_info = pd.DataFrame({
-                'BTC-USD': ['{:.2f}%'.format(100 * btc_expected_returns), '{:.2f}%'.format(100 * btc_volatility)],
-                'Portfoliu': ['{:.2f}%'.format(100 * portfolio_expected_returns), '{:.2f}%'.format(100 * portfolio_volatility)]
-            }, index=['Profit așteptat', 'Volatilitate'])
-            st.dataframe(df_info)
-            
-            
-    typed_stocks = input_col.text_input(
-    label="Introduceți acțiunile separate de virgulă (,)",
-    placeholder="voo, vwra.l, qqq, gbug, spbo",
-    help="Numele acțiunilor se pot găsi pe yahoofinance.com.")
-    typed_amount = input_col.number_input("Introduceți suma investită în portfoliu:", min_value=1000.0, step=1000.0, value=1500.0, format="%.2f")
-    stocks_split = [s.strip() for s in typed_stocks.split(",") if s.strip()]
-    if input_col.button("Optimizare portofoliu acțiuni propriu"):
-        if len(stocks_split) < 2:
-            st.warning("Trebuie selectate cel puțin 2 tipuri de active.")
-        else:
-            my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover = optimize_portfolio(stocks_split,start_date,end_date,typed_amount)
-            
-     
-            df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
-            df_allocation['Preț acțiune'] = '$' + latest_price.round(2).astype(str)
-            df_allocation['Cost'] = '$' + (df_allocation['Shares'] * latest_price).round(2).astype(str)
-    
-           
-            col1, col2 = st.columns([2, 2.5])
-
-           
-            with col1:
-                st.write("Fonduri alocate:")
-                st.dataframe(df_allocation)
-                st.write("Fonduri rămase: ${:.2f}".format(leftover))
-
-           
-            with col2:
-                st.write("Compoziție portofoliu optimizat:")
+                st.write("Portfolio vs. S&P 500:")
+                st.table(df_info)
                 
-                colors = sns.color_palette('Set3', len(df_allocation))
+                sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio = calculate_performance_metrics(portfolio_returns, sp500_returns, risk_free_rate)
+                st.write(f"Sharpe Ratio: {sharpe_ratio:.2f}")
+                st.write(f"Sortino Ratio: {sortino_ratio:.2f}")
+                st.write(f"Max Drawdown: {max_drawdown:.2%}")
+                st.write(f"Portfolio Beta: {beta:.2f}")
+                st.write(f"Treynor Ratio: {treynor_ratio:.2f}")
 
-               
-                explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
-
-               
-                plt.figure(figsize=(8,8))
-                plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
-                plt.axis('equal')
-
-                st.pyplot(plt)
-            
-            
-            sp500_prices = get_sp500_prices(start_date, end_date)
-
-            
-            sp500_returns = sp500_prices.pct_change().dropna()
-
-            
-            my_portfolio_returns_array = my_portfolio_returns.values
-            cleaned_weights_array = np.array(list(cleaned_weights.values()))
-
-            
-            portfolio_returns = np.dot(my_portfolio_returns_array, cleaned_weights_array)
-
-           
-            sp500_expected_returns = sp500_returns.mean() * 252 
-            sp500_volatility = sp500_returns.std() * np.sqrt(252)
-            portfolio_expected_returns = portfolio_returns.mean() * 252
-            portfolio_volatility = portfolio_returns.std() * np.sqrt(252)
-
-          
-            combined_returns = pd.DataFrame({'S&P 500': sp500_returns, 'Portfoliu dvs.': portfolio_returns}, index=my_portfolio_returns.index)
-
-        
-            plt.figure(figsize=(12, 6))
-            plt.plot(combined_returns.index, 100 * (combined_returns + 1).cumprod(), lw=2)
-            plt.legend(combined_returns.columns)
-            plt.xlabel('Dată')
-            plt.ylabel('Rentabilitatea cumulativă (%)')
-            plt.title('S&P 500 vs. Portofoliu optimizat')
-            plt.grid(True)
-            plt.tight_layout()     
-            st.pyplot(plt)
-            df_info = pd.DataFrame({
-                'S&P 500': ['{:.2f}%'.format(100 * sp500_expected_returns), '{:.2f}%'.format(100 * sp500_volatility)],
-                'Portfoliu': ['{:.2f}%'.format(100 * portfolio_expected_returns), '{:.2f}%'.format(100 * portfolio_volatility)]
-            }, index=['Profit așteptat', 'Volatilitate'])
-
-            st.dataframe(df_info)         
-            
 if __name__ == "__main__":
     main()
