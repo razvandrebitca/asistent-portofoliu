@@ -5,5 +5,4 @@ yfinance
 matplotlib
 seaborn
 pyportfolioopt
-scikit-learn
 streamlit-authenticator
