@@ -11,13 +11,10 @@ import streamlit_authenticator as stauth
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import risk_models
 from pypfopt import expected_returns
-from pypfopt import objective_functions
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 from login import login, register, logout, is_logged_in, initialize_session_state
 
 st.set_page_config(page_title="Portfolio Analysis Assistant", layout="wide")
-
-
 
 # Function to retrieve S&P 500 tickers from Wikipedia
 def get_sp500_tickers():
@@ -53,8 +50,7 @@ def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount):
     S = risk_models.sample_cov(my_portfolio)
     
     ef = EfficientFrontier(mu, S)
-    ef.add_objective(objective_functions.L2_reg, gamma=2)
-    weights = ef.max_sharpe()
+    weights = ef.max_sharpe()  # Optimizes for maximum Sharpe ratio
     cleaned_weights = ef.clean_weights()
     
     latest_prices = get_latest_prices(my_portfolio)
@@ -79,38 +75,37 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
     
     return sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio
 
-
-
 # Main function for the Streamlit app
 def main():
- names = ["John Doe","Peter Miller"]
- usernames =["john","peter"]
- passwords=["abc123","test1234"]
- 
- file_path= Path(__file__).parent / "hashed_pw.pk1"
- with file_path.open("rb") as file:
-    hashed_passwords = pickle.load(file)   
- credentials = {
-        "usernames":{
-            usernames[0]:{
-                "name":names[0],
-                "password":hashed_passwords[0]
-                },
-            usernames[1]:{
-                "name":names[1],
-                "password":hashed_passwords[1]
-                }            
-            }
-        }   
- authenticator = stauth.Authenticate(credentials,"app_home","auth",cookie_expiry_days=30)
- name, authentification_status, username = authenticator.login('main', fields = {'Form name': 'Login'})
+    names = ["John Doe", "Peter Miller"]
+    usernames = ["john", "peter"]
+    passwords = ["abc123", "test1234"]
     
- if authentification_status == False:
+    file_path = Path(__file__).parent / "hashed_pw.pk1"
+    with file_path.open("rb") as file:
+        hashed_passwords = pickle.load(file)
+        
+    credentials = {
+        "usernames": {
+            usernames[0]: {
+                "name": names[0],
+                "password": hashed_passwords[0]
+            },
+            usernames[1]: {
+                "name": names[1],
+                "password": hashed_passwords[1]
+            }
+        }
+    }
+    
+    authenticator = stauth.Authenticate(credentials, "app_home", "auth", cookie_expiry_days=30)
+    name, authentification_status, username = authenticator.login('main', fields={'Form name': 'Login'})
+    
+    if authentification_status == False:
         st.error("Invalid username or password")
-   
- if authentification_status:
-        # Once logged in, render the main application content
-        authenticator.logout("Logout","sidebar")
+    
+    if authentification_status:
+        authenticator.logout("Logout", "sidebar")
         st.sidebar.title(f"Welcome, {name}!")      
         st.markdown(""" <style>
         #MainMenu {visibility: hidden;}
@@ -118,7 +113,6 @@ def main():
         </style> """, unsafe_allow_html=True)
 
         st.title("Portfolio Analysis Assistant")
-
         st.markdown("---")
         st.subheader("Description")
         st.info(
@@ -165,7 +159,6 @@ def main():
             format="%.2f"
         )
 
-        # Risk-Free Rate Input
         risk_free_rate = input_col.number_input(
             "Enter risk-free rate (in %):", 
             min_value=0.0, 
@@ -197,53 +190,32 @@ def main():
                     colors = sns.color_palette('Set3', len(df_allocation))
                     explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
 
-                    plt.figure(figsize=(8,8))
+                    plt.figure(figsize=(8, 8))
                     plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
                     plt.axis('equal')
                     st.pyplot(plt)
                 
                 sp500_prices = get_sp500_prices(start_date, end_date)
                 sp500_returns = sp500_prices.pct_change().dropna()
-                portfolio_returns = np.dot(my_portfolio_returns.values, np.array(list(cleaned_weights.values())))
+                portfolio_returns = my_portfolio_returns.mean(axis=1)
 
-                sp500_expected_returns = sp500_returns.mean() * 252 
-                sp500_volatility = sp500_returns.std() * np.sqrt(252)
-                portfolio_expected_returns = portfolio_returns.mean() * 252
-                portfolio_volatility = portfolio_returns.std() * np.sqrt(252)
-
-                combined_returns = pd.DataFrame({'S&P 500': sp500_returns, 'Your Portfolio': portfolio_returns}, index=my_portfolio_returns.index)
-
-                plt.figure(figsize=(12, 6))
-                plt.plot(combined_returns.index, 100 * (combined_returns + 1).cumprod(), lw=2)
-                plt.legend(combined_returns.columns)
-                plt.xlabel('Date')
-                plt.ylabel('Cumulative Return (%)')
-                plt.title('S&P 500 vs. Optimized Portfolio')
-                plt.grid(True)
-                plt.tight_layout()     
-                st.pyplot(plt)
-
-                # Correlation Heatmap
-                st.write("Correlation Heatmap of Selected Assets:")
-                corr_matrix = my_portfolio.corr()
-                plt.figure(figsize=(10, 8))
-                sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", linewidths=0.5)
-                st.pyplot(plt)
-                
-                df_info = pd.DataFrame({
-                    'S&P 500': ['{:.2f}%'.format(100 * sp500_expected_returns), '{:.2f}%'.format(100 * sp500_volatility)],
-                    'Your Portfolio': ['{:.2f}%'.format(100 * portfolio_expected_returns), '{:.2f}%'.format(100 * portfolio_volatility)]
-                }, index=['Expected Return', 'Volatility'])
-
-                st.write("Portfolio vs. S&P 500:")
-                st.table(df_info)
-                
                 sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio = calculate_performance_metrics(portfolio_returns, sp500_returns, risk_free_rate)
+
+                st.write("Portfolio Performance Metrics:")
                 st.write(f"Sharpe Ratio: {sharpe_ratio:.2f}")
                 st.write(f"Sortino Ratio: {sortino_ratio:.2f}")
                 st.write(f"Max Drawdown: {max_drawdown:.2%}")
-                st.write(f"Portfolio Beta: {beta:.2f}")
+                st.write(f"Beta: {beta:.2f}")
                 st.write(f"Treynor Ratio: {treynor_ratio:.2f}")
+
+                plt.figure(figsize=(10, 6))
+                cumulative_returns = (1 + portfolio_returns).cumprod()
+                sp500_cumulative_returns = (1 + sp500_returns).cumprod()
+                plt.plot(cumulative_returns, label="Portfolio")
+                plt.plot(sp500_cumulative_returns, label="S&P 500")
+                plt.legend(loc="best")
+                plt.title("Cumulative Returns")
+                st.pyplot(plt)
 
 if __name__ == "__main__":
     main()
