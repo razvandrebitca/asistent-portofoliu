@@ -132,6 +132,19 @@ def apply_theme(theme):
             h1, h2, h3, h4, h5, h6 {
                 color: black !important;
             }
+            .st-c6 {
+            color: rgb(51, 184, 255);
+            }
+          .st-emotion-cache-6qob1r {
+           position: relative;
+            height: 100%;
+            width: 100%;
+           overflow: overlay;
+           background-color:white!important;
+           }
+            p{
+                color:black;
+            }
         </style>
         """
         st.markdown(light_css, unsafe_allow_html=True)
