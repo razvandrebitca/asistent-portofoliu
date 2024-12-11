@@ -5,77 +5,15 @@ import yfinance as yf
 import datetime as dt
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pickle
-from pathlib import Path
-import streamlit_authenticator as stauth
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import risk_models
 from pypfopt import expected_returns
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
-from login import login, register, logout, is_logged_in, initialize_session_state
+from translations import translations
 
 st.set_page_config(page_title="Portfolio Analysis Assistant", layout="wide")
 language = st.sidebar.radio("Language / Limba:", ("English", "Română"))
-translations = {
-    "English": {
-        "title": "Portfolio Analysis Assistant",
-        "description_text": "This app uses Markowitz's algorithm to optimize portfolios containing S&P 500 stocks and cryptocurrencies, using historical trading data.",
-        "start_date": "Start Date:",
-        "end_date": "End Date:",
-        "select_assets": "Select S&P 500 stocks for your portfolio:",
-        "custom_tickers": "Enter custom stock tickers separated by commas (e.g., AAPL, MSFT, TSLA)",
-        "crypto_symbols": "Enter cryptocurrency symbols separated by commas (e.g., BTC, ETH, ADA)",
-        "portfolio_amount": "Enter portfolio amount:",
-        "risk_free_rate": "Enter risk-free rate (in %):",
-        "optimize_button": "Optimize Portfolio",
-        "warning_assets": "At least 2 assets must be selected.",
-        "allocated_funds": "Allocated Funds:",
-        "remaining_funds": "Remaining Funds:",
-        "optimized_portfolio": "Optimized Portfolio Composition:",
-        "cumulative_return": "S&P 500 vs. Optimized Portfolio",
-        "correlation_heatmap": "Correlation Heatmap of Selected Assets:",
-        "portfolio_vs_sp500": "Portfolio vs. S&P 500:",
-        "sharpe_ratio": "Sharpe Ratio:",
-        "sortino_ratio": "Sortino Ratio:",
-        "max_drawdown": "Max Drawdown:",
-        "portfolio_beta": "Portfolio Beta:",
-        "treynor_ratio": "Treynor Ratio:",
-        "welcome":"Welcome",
-        "time":"Select Time Period for Historical Data",
-        "portfolio":"Portfolio",
-        "description":"Description",
-        "theme":"Theme"
-    },
-    "Română": {
-        "title": "Asistent de Analiză a Portofoliului",
-        "description_text": "Această aplicație folosește algoritmul lui Markowitz pentru a optimiza portofoliile care conțin acțiuni S&P 500 și criptomonede, folosind date istorice de tranzacționare.",
-        "start_date": "Data de început:",
-        "end_date": "Data de sfârșit:",
-        "select_assets": "Selectează acțiunile S&P 500 pentru portofoliul tău:",
-        "custom_tickers": "Introdu simbolurile acțiunilor personalizate separate prin virgule (de ex., AAPL, MSFT, TSLA)",
-        "crypto_symbols": "Introdu simbolurile criptomonedelor separate prin virgule (de ex., BTC, ETH, ADA)",
-        "portfolio_amount": "Introdu suma portofoliului:",
-        "risk_free_rate": "Introdu rata fără risc (în %):",
-        "optimize_button": "Optimizează Portofoliul",
-        "warning_assets": "Trebuie selectate cel puțin 2 active.",
-        "allocated_funds": "Fonduri Alocate:",
-        "remaining_funds": "Fonduri rămase:",
-        "optimized_portfolio": "Compoziția Portofoliului Optimizat:",
-        "cumulative_return": "S&P 500 vs. Portofoliu Optimizat",
-        "correlation_heatmap": "Harta de Corelație a Activelor Selectate:",
-        "portfolio_vs_sp500": "Portofoliul vs. S&P 500:",
-        "sharpe_ratio": "Raport Sharpe:",
-        "sortino_ratio": "Raport Sortino:",
-        "max_drawdown": "Maximă Scădere:",
-        "portfolio_beta": "Beta Portofoliu:",
-        "treynor_ratio": "Raport Treynor:",
-        "welcome":"Bun venit",
-        "time":"Selectați intervalul de timp pentru datele istorice",
-        "portfolio":"Portofoliu",
-        "description":"Descriere",
-        "theme":"Temă"
-    }
-}
+
 def apply_theme(theme):
    if theme == "Dark":
         dark_css = """
@@ -211,98 +149,62 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
 # Main function for the Streamlit app
 def main():
     t = translations[language]
-    theme_choice = st.sidebar.radio(t["theme"], ("Light", "Dark"))
+    theme_choice = st.sidebar.radio(t["theme"], ("Dark", "Light"))
     apply_theme(theme_choice)
-    
-    
-    names = ["John Doe", "Peter Miller"]
-    usernames = ["john", "peter"]
-    passwords = ["abc123", "test1234"]
-    
-    file_path = Path(__file__).parent / "hashed_pw.pk1"
-    with file_path.open("rb") as file:
-        hashed_passwords = pickle.load(file)
-        
-    credentials = {
-        "usernames": {
-            usernames[0]: {
-                "name": names[0],
-                "password": hashed_passwords[0]
-            },
-            usernames[1]: {
-                "name": names[1],
-                "password": hashed_passwords[1]
-            }
-        }
-    }
-    
-    authenticator = stauth.Authenticate(credentials, "app_home", "auth", cookie_expiry_days=30)
-    name, authentification_status, username = authenticator.login('main', fields={'Form name': 'Login'})
-    
-    if authentification_status == False:
-        st.error("Invalid username or password")
-    
-    if authentification_status:
-        authenticator.logout("Logout", "sidebar")
-        st.sidebar.title(t['welcome']+f", {name}!")      
-        st.markdown(""" <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        </style> """, unsafe_allow_html=True)
 
-        st.title(t["title"])
-        st.markdown("---")
-        st.subheader(t["description"])
-        st.info(t['description_text'])
-        st.markdown("---")
+    st.title(t["title"])
+    st.markdown("---")
+    st.subheader(t["description"])
+    st.info(t['description_text'])
+    st.markdown("---")
 
-        input_col = st.sidebar
-        input_col.header(t['time'])
+    input_col = st.sidebar
+    input_col.header(t['time'])
 
-        start_date = input_col.date_input(t['start_date'], dt.datetime(2020, 1, 1))
-        end_date = input_col.date_input(t['end_date'], dt.datetime.now())
+    start_date = input_col.date_input(t['start_date'], dt.datetime(2020, 1, 1))
+    end_date = input_col.date_input(t['end_date'], dt.datetime.now())
 
-        ticker_company_dict = get_sp500_tickers()
+    ticker_company_dict = get_sp500_tickers()
 
-        input_col.header(t['portfolio'])
+    input_col.header(t['portfolio'])
 
-        selected_tickers = input_col.multiselect(
-            t['select_assets'], 
-            list(ticker_company_dict.keys()), 
-            format_func=lambda ticker: f"{ticker}: {ticker_company_dict[ticker]}"
-        )
+    selected_tickers = input_col.multiselect(
+        t['select_assets'], 
+        list(ticker_company_dict.keys()), 
+        format_func=lambda ticker: f"{ticker}: {ticker_company_dict[ticker]}"
+    )
 
-        # Input for custom ticker symbols
-        custom_tickers = input_col.text_input(t['custom_tickers'])
+    # Input for custom ticker symbols
+    custom_tickers = input_col.text_input(t['custom_tickers'])
 
-        if custom_tickers:
-            custom_tickers_list = [ticker.strip() for ticker in custom_tickers.split(',')]
-            selected_tickers.extend(custom_tickers_list)
+    if custom_tickers:
+        custom_tickers_list = [ticker.strip() for ticker in custom_tickers.split(',')]
+        selected_tickers.extend(custom_tickers_list)
 
-        # Input for cryptocurrencies
-        crypto_symbols = input_col.text_input(t['crypto_symbols'])
+    # Input for cryptocurrencies
+    crypto_symbols = input_col.text_input(t['crypto_symbols'])
 
-        if crypto_symbols:
-            crypto_symbols_list = [symbol.strip() for symbol in crypto_symbols.split(',')]
-            selected_tickers.extend([symbol + '-USD' for symbol in crypto_symbols_list])
+    if crypto_symbols:
+        crypto_symbols_list = [symbol.strip() for symbol in crypto_symbols.split(',')]
+        selected_tickers.extend([symbol + '-USD' for symbol in crypto_symbols_list])
 
-        portfolio_amount = input_col.number_input(
-            t['portfolio_amount'], 
-            min_value=1000.0, 
-            step=1000.0, 
-            value=1000.0, 
-            format="%.2f"
-        )
+    portfolio_amount = input_col.number_input(
+        t['portfolio_amount'], 
+        min_value=1000.0, 
+        step=1000.0, 
+        value=1000.0, 
+        format="%.2f"
+    )
 
-        risk_free_rate = input_col.number_input(
-            t['risk_free_rate'], 
-            min_value=0.0, 
-            max_value=10.0, 
-            step=0.1, 
-            value=1.0
-        ) / 100
+    risk_free_rate = input_col.number_input(
+        t['risk_free_rate'], 
+        min_value=0.0, 
+        max_value=10.0, 
+        step=0.1, 
+        value=1.0
+    ) / 100
 
-        if input_col.button(t['optimize_button']):
+    if input_col.button(t['optimize_button']):
             if len(selected_tickers) < 2:
                 st.warning(t['warning_assets'])
             else:
@@ -340,7 +242,7 @@ def main():
                 st.write(t['sharpe_ratio']+f" {sharpe_ratio:.2f}")
                 st.write(t['sortino_ratio']+f" {sortino_ratio:.2f}")
                 st.write(t['max_drawdown']+f" {max_drawdown:.2%}")
-                st.write(t['portfolio_beta']+f": {beta:.2f}")
+                st.write(t['portfolio_beta']+f" {beta:.2f}")
                 st.write(t['treynor_ratio']+f" {treynor_ratio:.2f}")
 
                 plt.figure(figsize=(10, 6))
