@@ -146,6 +146,41 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
     
     return sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio
 
+def plot_asset_prices(portfolio_data):
+    st.subheader("Historical Price Movements")
+    st.line_chart(portfolio_data)
+
+def plot_risk_return(my_portfolio_returns):
+    st.subheader("Risk vs Return Analysis")
+    asset_means = my_portfolio_returns.mean() * 252
+    asset_vols = my_portfolio_returns.std() * np.sqrt(252)
+    plt.figure(figsize=(10, 6))
+    plt.scatter(asset_vols, asset_means, color="blue", alpha=0.7)
+    for i, asset in enumerate(asset_means.index):
+        plt.text(asset_vols[i], asset_means[i], asset, fontsize=9)
+    plt.xlabel("Annualized Risk (Volatility)")
+    plt.ylabel("Annualized Return")
+    plt.title("Risk vs Return of Selected Assets")
+    st.pyplot(plt)
+
+def plot_correlation_heatmap(my_portfolio_returns):
+    st.subheader("Asset Correlation Heatmap")
+    corr_matrix = my_portfolio_returns.corr()
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
+    plt.title("Correlation Matrix of Selected Assets")
+    st.pyplot(plt)
+
+def backtest_portfolio(portfolio_returns, benchmark_returns):
+    cumulative_portfolio = (1 + portfolio_returns).cumprod()
+    cumulative_benchmark = (1 + benchmark_returns).cumprod()
+    plt.figure(figsize=(10, 6))
+    plt.plot(cumulative_portfolio, label="Portfolio", color="green")
+    plt.plot(cumulative_benchmark, label="Benchmark (S&P 500)", color="orange")
+    plt.legend()
+    plt.title("Portfolio vs Benchmark")
+    st.pyplot(plt)
+
 # Main function for the Streamlit app
 def main():
     t = translations[language]
@@ -188,6 +223,20 @@ def main():
         crypto_symbols_list = [symbol.strip() for symbol in crypto_symbols.split(',')]
         selected_tickers.extend([symbol + '-USD' for symbol in crypto_symbols_list])
 
+
+    # File uploader for tickers
+    uploaded_file = input_col.file_uploader(t['upload'], type=["csv", "txt"])
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith("csv"):
+                file_tickers = pd.read_csv(uploaded_file, header=None).iloc[:, 0].tolist()
+            else:
+                file_tickers = uploaded_file.read().decode("utf-8").splitlines()
+            selected_tickers.extend([ticker.strip() for ticker in file_tickers if ticker.strip()])
+            st.sidebar.success(t['success'])
+        except Exception as e:
+            st.sidebar.error(f"{t['error']}: {e}")
+
     portfolio_amount = input_col.number_input(
         t['portfolio_amount'], 
         min_value=1000.0, 
@@ -196,13 +245,23 @@ def main():
         format="%.2f"
     )
 
-    risk_free_rate = input_col.number_input(
-        t['risk_free_rate'], 
-        min_value=0.0, 
-        max_value=10.0, 
-        step=0.1, 
-        value=1.0
-    ) / 100
+    col_rfr, col_tooltip = st.sidebar.columns([8, 1])
+    with col_rfr:
+        risk_free_rate = st.number_input(
+            t['risk_free_rate'], 
+            min_value=0.0, 
+            max_value=10.0, 
+            step=0.1, 
+            value=1.0
+        ) / 100
+    with col_tooltip:
+        st.sidebar.markdown(
+            "", 
+            help="""
+            Reprezintă rata de câștig ipotetică pe care un investitor o poate câștiga fără a-și asuma niciun risc.
+            """
+        )
+
 
     if input_col.button(t['optimize_button']):
             if len(selected_tickers) < 2:
@@ -213,7 +272,6 @@ def main():
                 df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
                 df_allocation['Price per Share'] = '$' + latest_price.round(2).astype(str)
                 df_allocation['Cost'] = '$' + (df_allocation['Shares'] * latest_price).round(2).astype(str)
-
                 col1, col2 = st.columns([2, 2.5])
 
                 with col1:
@@ -235,7 +293,7 @@ def main():
                 sp500_prices = get_sp500_prices(start_date, end_date)
                 sp500_returns = sp500_prices.pct_change().dropna()
                 portfolio_returns = my_portfolio_returns.mean(axis=1)
-
+                backtest_portfolio(my_portfolio_returns.mean(axis=1), sp500_returns)
                 sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio = calculate_performance_metrics(portfolio_returns, sp500_returns, risk_free_rate)
 
                 st.write("Portfolio Performance Metrics:")
@@ -244,15 +302,10 @@ def main():
                 st.write(t['max_drawdown']+f" {max_drawdown:.2%}")
                 st.write(t['portfolio_beta']+f" {beta:.2f}")
                 st.write(t['treynor_ratio']+f" {treynor_ratio:.2f}")
+                plot_asset_prices(my_portfolio)
+                plot_risk_return(my_portfolio_returns)
+                plot_correlation_heatmap(my_portfolio_returns)
 
-                plt.figure(figsize=(10, 6))
-                cumulative_returns = (1 + portfolio_returns).cumprod()
-                sp500_cumulative_returns = (1 + sp500_returns).cumprod()
-                plt.plot(cumulative_returns, label="Portfolio")
-                plt.plot(sp500_cumulative_returns, label="S&P 500")
-                plt.legend(loc="best")
-                plt.title("Cumulative Returns")
-                st.pyplot(plt)
 
 if __name__ == "__main__":
     main()

@@ -26,7 +26,10 @@ translations = {
         "time":"Select Time Period for Historical Data",
         "portfolio":"Portfolio",
         "description":"Description",
-        "theme":"Theme"
+        "theme": "Theme",
+        "upload": "Upload file with tickers (CSV or TXT).",
+        "success": "Success",
+        "error":"Error"
     },
     "Română": {
         "title": "Asistent de Analiză a Portofoliului",
@@ -55,6 +58,9 @@ translations = {
         "time":"Selectați intervalul de timp pentru datele istorice",
         "portfolio":"Portofoliu",
         "description":"Descriere",
-        "theme":"Temă"
+        "theme": "Temă",
+        "upload": "Încărcați fișierul cu tickere (CSV sau TXT).",
+        "success": "Succes",
+        "error":"Eroare"
     }
 }
