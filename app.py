@@ -13,7 +13,7 @@ from translations import translations
 
 st.set_page_config(page_title="Portfolio Analysis Assistant", layout="wide")
 language = st.sidebar.radio("Language / Limba:", ("English", "Română"))
-
+t = translations[language]
 def apply_theme(theme):
    if theme == "Dark":
         dark_css = """
@@ -147,28 +147,28 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
     return sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio
 
 def plot_asset_prices(portfolio_data):
-    st.subheader("Historical Price Movements")
+    st.subheader(t['price_movement'])
     st.line_chart(portfolio_data)
 
 def plot_risk_return(my_portfolio_returns):
-    st.subheader("Risk vs Return Analysis")
+    st.subheader(t['risk_analysis'])
     asset_means = my_portfolio_returns.mean() * 252
     asset_vols = my_portfolio_returns.std() * np.sqrt(252)
     plt.figure(figsize=(10, 6))
     plt.scatter(asset_vols, asset_means, color="blue", alpha=0.7)
     for i, asset in enumerate(asset_means.index):
-        plt.text(asset_vols[i], asset_means[i], asset, fontsize=9)
-    plt.xlabel("Annualized Risk (Volatility)")
-    plt.ylabel("Annualized Return")
-    plt.title("Risk vs Return of Selected Assets")
+        plt.text(asset_vols.iloc[i], asset_means.iloc[i], asset, fontsize=9)
+    plt.xlabel(t['annual_risk'])
+    plt.ylabel(t['annual_return'])
+    plt.title(t['risk_return'])
     st.pyplot(plt)
 
 def plot_correlation_heatmap(my_portfolio_returns):
-    st.subheader("Asset Correlation Heatmap")
+    st.subheader(t['heatmap'])
     corr_matrix = my_portfolio_returns.corr()
     plt.figure(figsize=(10, 8))
     sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
-    plt.title("Correlation Matrix of Selected Assets")
+    plt.title(t['correlation_matrix'])
     st.pyplot(plt)
 
 def backtest_portfolio(portfolio_returns, benchmark_returns):
@@ -178,12 +178,12 @@ def backtest_portfolio(portfolio_returns, benchmark_returns):
     plt.plot(cumulative_portfolio, label="Portfolio", color="green")
     plt.plot(cumulative_benchmark, label="Benchmark (S&P 500)", color="orange")
     plt.legend()
-    plt.title("Portfolio vs Benchmark")
+    plt.title(t['cumulative_return'])
     st.pyplot(plt)
 
 # Main function for the Streamlit app
 def main():
-    t = translations[language]
+   
     theme_choice = st.sidebar.radio(t["theme"], ("Dark", "Light"))
     apply_theme(theme_choice)
 
@@ -257,9 +257,7 @@ def main():
     with col_tooltip:
         st.sidebar.markdown(
             "", 
-            help="""
-            Reprezintă rata de câștig ipotetică pe care un investitor o poate câștiga fără a-și asuma niciun risc.
-            """
+            help=t['tooltip_risk']
         )
 
 
@@ -275,12 +273,12 @@ def main():
                 col1, col2 = st.columns([2, 2.5])
 
                 with col1:
-                    st.write(t['allocated_funds'])
+                    st.subheader(t['allocated_funds'])
                     st.dataframe(df_allocation)
-                    st.write(t['remaining_funds']+" ${:.2f}".format(leftover))
+                    st.subheader(t['remaining_funds']+" ${:.2f}".format(leftover))
 
                 with col2:
-                    st.write(t['optimized_portfolio'])
+                    st.subheader(t['optimized_portfolio'])
                     
                     colors = sns.color_palette('Set3', len(df_allocation))
                     explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
@@ -296,12 +294,71 @@ def main():
                 backtest_portfolio(my_portfolio_returns.mean(axis=1), sp500_returns)
                 sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio = calculate_performance_metrics(portfolio_returns, sp500_returns, risk_free_rate)
 
-                st.write("Portfolio Performance Metrics:")
-                st.write(t['sharpe_ratio']+f" {sharpe_ratio:.2f}")
-                st.write(t['sortino_ratio']+f" {sortino_ratio:.2f}")
-                st.write(t['max_drawdown']+f" {max_drawdown:.2%}")
-                st.write(t['portfolio_beta']+f" {beta:.2f}")
-                st.write(t['treynor_ratio']+f" {treynor_ratio:.2f}")
+                st.subheader(t['portfolio_metrics'])
+                
+                st.markdown(
+                 f"""
+                  <div style="margin-top:20px; font-size: 16px;">
+                 {t['sharpe_ratio']} {sharpe_ratio:.2f}
+                 <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
+                      title="{t['tooltip_sharpe']}">
+                      ℹ
+                 </span>
+                 </div>
+                 """,
+                  unsafe_allow_html=True
+                 )
+
+                st.markdown(
+                f"""
+             <div style="margin-top:20px; font-size: 16px;">
+                {t['sortino_ratio']} {sortino_ratio:.2f}
+                <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
+                      title="{t['tooltip_sortino']}">
+                      ℹ
+                </span>
+                </div>
+                """,
+              unsafe_allow_html=True
+              )
+                st.markdown(
+               f"""
+               <div style="margin-top:20px; font-size: 16px;">
+                {t['max_drawdown']} {max_drawdown:.2%}
+                <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
+                      title="{t['tooltip_max']}">
+                      ℹ
+                </span>
+               </div>
+              """,
+               unsafe_allow_html=True
+              )
+
+                st.markdown(
+              f"""
+             <div style="margin-top:20px;font-size: 16px;">
+                {t['portfolio_beta']} {beta:.2f}
+                <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
+                      title="{t['tooltip_beta']}">
+                      ℹ
+                </span>
+               </div>
+              """,
+               unsafe_allow_html=True
+               )
+
+                st.markdown(
+             f"""
+             <div style="margin-top:20px; font-size: 16px;">
+                {t['treynor_ratio']} {treynor_ratio:.2f}
+                <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
+                      title="{t['tooltip_treynor']}">
+                      ℹ
+                </span>
+              </div>
+              """,
+              unsafe_allow_html=True
+             )
                 plot_asset_prices(my_portfolio)
                 plot_risk_return(my_portfolio_returns)
                 plot_correlation_heatmap(my_portfolio_returns)
