@@ -110,19 +110,16 @@ def get_sp500_prices(start_date, end_date):
     sp500_prices = sp500_data['Adj Close']
     return sp500_prices
 
-# Function to optimize portfolio using Markowitz efficient frontier
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount):
-    my_portfolio = pd.DataFrame()
-    for asset in selected_assets:
-        data = yf.download(asset, start=start_date, end=end_date)
-        if 'Adj Close' in data.columns:
-            my_portfolio[asset] = data['Adj Close']
-        else:
-            st.warning(f"Data for {asset} is unavailable or does not include 'Adj Close'. Skipping this asset.")
-    
+    # Download data for all selected assets at once
+    my_portfolio = yf.download(selected_assets, start=start_date, end=end_date)['Adj Close']
+
+    # Drop assets with no data
+    my_portfolio.dropna(how='all', axis=1, inplace=True)
+
     if my_portfolio.empty:
         st.error("No valid data available for the selected assets.")
-        return None, None, None, None, None, None
+        return None
 
     my_portfolio_returns = my_portfolio.pct_change().dropna()
     mu = expected_returns.mean_historical_return(my_portfolio)
@@ -137,6 +134,7 @@ def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount):
     allocation, leftover = da.lp_portfolio()
 
     return my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover
+
 
 
 # Function to calculate performance metrics
