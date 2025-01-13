@@ -114,21 +114,30 @@ def get_sp500_prices(start_date, end_date):
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount):
     my_portfolio = pd.DataFrame()
     for asset in selected_assets:
-        my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date)['Adj Close']
+        data = yf.download(asset, start=start_date, end=end_date)
+        if 'Adj Close' in data.columns:
+            my_portfolio[asset] = data['Adj Close']
+        else:
+            st.warning(f"Data for {asset} is unavailable or does not include 'Adj Close'. Skipping this asset.")
     
+    if my_portfolio.empty:
+        st.error("No valid data available for the selected assets.")
+        return None, None, None, None, None, None
+
     my_portfolio_returns = my_portfolio.pct_change().dropna()
     mu = expected_returns.mean_historical_return(my_portfolio)
     S = risk_models.sample_cov(my_portfolio)
-    
+
     ef = EfficientFrontier(mu, S)
     weights = ef.max_sharpe()  # Optimizes for maximum Sharpe ratio
     cleaned_weights = ef.clean_weights()
-    
+
     latest_prices = get_latest_prices(my_portfolio)
     da = DiscreteAllocation(cleaned_weights, latest_prices, total_portfolio_value=portfolio_amount)
     allocation, leftover = da.lp_portfolio()
-    
+
     return my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover
+
 
 # Function to calculate performance metrics
 def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate=0.01):
