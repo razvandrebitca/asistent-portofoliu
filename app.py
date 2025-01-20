@@ -5,11 +5,13 @@ import yfinance as yf
 import datetime as dt
 import matplotlib.pyplot as plt
 import seaborn as sns
+from fpdf import FPDF
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import risk_models
 from pypfopt import expected_returns
 from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 from translations import translations
+import io
 
 st.set_page_config(page_title="Portfolio Analysis Assistant", layout="wide")
 language = st.sidebar.radio("Language / Limba:", ("English", "Română"))
@@ -87,6 +89,9 @@ def apply_theme(theme):
         """
         st.markdown(light_css, unsafe_allow_html=True)
 
+
+
+
 # Function to retrieve S&P 500 tickers from Wikipedia
 def get_sp500_tickers():
     url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
@@ -110,24 +115,53 @@ def get_sp500_prices(start_date, end_date):
     sp500_prices = sp500_data['Adj Close']
     return sp500_prices
 
-# Function to optimize portfolio using Markowitz efficient frontier
-def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount):
+# # Function to optimize portfolio using Markowitz efficient frontier
+# def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount):
+#     my_portfolio = pd.DataFrame()
+#     for asset in selected_assets:
+#         my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date)['Adj Close']
+    
+#     my_portfolio_returns = my_portfolio.pct_change().dropna()
+#     mu = expected_returns.mean_historical_return(my_portfolio)
+#     S = risk_models.sample_cov(my_portfolio)
+    
+#     ef = EfficientFrontier(mu, S)
+#     weights = ef.max_sharpe()  # Optimizes for maximum Sharpe ratio
+#     cleaned_weights = ef.clean_weights()
+    
+#     latest_prices = get_latest_prices(my_portfolio)
+#     da = DiscreteAllocation(cleaned_weights, latest_prices, total_portfolio_value=portfolio_amount)
+#     allocation, leftover = da.lp_portfolio()
+    
+#     return my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover
+# Adjusted optimize_portfolio function with risk tolerance
+def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance):
     my_portfolio = pd.DataFrame()
     for asset in selected_assets:
         my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date)['Adj Close']
-    
+
     my_portfolio_returns = my_portfolio.pct_change().dropna()
     mu = expected_returns.mean_historical_return(my_portfolio)
     S = risk_models.sample_cov(my_portfolio)
-    
+
     ef = EfficientFrontier(mu, S)
-    weights = ef.max_sharpe()  # Optimizes for maximum Sharpe ratio
+
+    # Adjust optimization strategy based on risk tolerance
+    if risk_tolerance == "Low":
+        weights = ef.min_volatility()  # Optimizes for minimum volatility
+    elif risk_tolerance == "Medium":
+        weights = ef.efficient_return(target_return=0.1)  # Target moderate return
+    elif risk_tolerance == "High":
+        weights = ef.max_sharpe()  # Optimizes for maximum Sharpe ratio
+    else:
+        weights = ef.max_sharpe()  # Default to max Sharpe ratio
+
     cleaned_weights = ef.clean_weights()
-    
+
     latest_prices = get_latest_prices(my_portfolio)
     da = DiscreteAllocation(cleaned_weights, latest_prices, total_portfolio_value=portfolio_amount)
     allocation, leftover = da.lp_portfolio()
-    
+
     return my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover
 
 # Function to calculate performance metrics
@@ -145,6 +179,8 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
     treynor_ratio = (portfolio_returns.mean() - risk_free_rate) / beta
     
     return sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio
+
+
 
 def plot_asset_prices(portfolio_data):
     st.subheader(t['price_movement'])
@@ -180,6 +216,66 @@ def backtest_portfolio(portfolio_returns, benchmark_returns):
     plt.legend()
     plt.title(t['cumulative_return'])
     st.pyplot(plt)
+
+# Generate Full PDF Report
+def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance, file_name="Portfolio_Report.pdf"):
+    # Optimize Portfolio
+    my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover = optimize_portfolio(
+        selected_assets, start_date, end_date, portfolio_amount, risk_tolerance
+    )
+    
+    # Retrieve Benchmark Data (S&P 500)
+    sp500_prices = yf.download('^GSPC', start=start_date, end=end_date)['Adj Close']
+    sp500_returns = sp500_prices.pct_change().dropna()
+    portfolio_returns = my_portfolio_returns.mean(axis=1)
+    
+    # Calculate Performance Metrics
+    sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio = calculate_performance_metrics(
+        portfolio_returns, sp500_returns, risk_free_rate
+    )
+    
+    # Prepare Data for PDF
+    metrics = {
+        "Sharpe Ratio": f"{sharpe_ratio:.2f}",
+        "Sortino Ratio": f"{sortino_ratio:.2f}",
+        "Max Drawdown": f"{max_drawdown:.2%}",
+        "Beta": f"{beta:.2f}",
+        "Treynor Ratio": f"{treynor_ratio:.2f}"
+    }
+    
+    # Generate PDF
+    pdf_buffer = io.BytesIO()
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    
+    # Title
+    pdf.cell(200, 10, txt=t['report'], ln=True, align='C')
+    pdf.ln(10)
+    
+    # Allocation
+    pdf.cell(200, 10, txt="Optimized Allocation", ln=True, align='L')
+    pdf.ln(5)
+    for asset, shares in allocation.items():
+        pdf.cell(200, 10, txt=f"{asset}: {shares} shares", ln=True, align='L')
+    pdf.ln(10)
+    
+    # Metrics
+    pdf.cell(200, 10, txt="Performance Metrics", ln=True, align='L')
+    pdf.ln(5)
+    for metric, value in metrics.items():
+        pdf.cell(200, 10, txt=f"{metric}: {value}", ln=True, align='L')
+    pdf.ln(10)
+    
+    # Remaining Funds
+    pdf.cell(200, 10, txt=f"Remaining Funds: ${leftover:.2f}", ln=True, align='L')
+    
+    # Save PDF to Buffer
+    pdf.output(dest="S").encode("latin1")
+    pdf_buffer.write(pdf.output(dest="S").encode("latin1"))
+    pdf_buffer.seek(0)
+    
+    return pdf_buffer
 
 # Main function for the Streamlit app
 def main():
@@ -260,12 +356,18 @@ def main():
             help=t['tooltip_risk']
         )
 
+        risk_tolerance = input_col.radio(
+        t["risk_tolerance"], 
+        ("Low", "Medium", "High"), 
+        help="Help"
+        )
+
 
     if input_col.button(t['optimize_button']):
             if len(selected_tickers) < 2:
                 st.warning(t['warning_assets'])
             else:
-                my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover = optimize_portfolio(selected_tickers, start_date, end_date, portfolio_amount)
+                my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover = optimize_portfolio(selected_tickers, start_date, end_date, portfolio_amount, risk_tolerance)
 
                 df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
                 df_allocation['Price per Share'] = '$' + latest_price.round(2).astype(str)
@@ -359,9 +461,17 @@ def main():
               """,
               unsafe_allow_html=True
              )
+                pdf_buffer = generate_full_pdf_report(selected_tickers, start_date, end_date, portfolio_amount, risk_free_rate,risk_tolerance)
+                st.download_button(
+                label="Download Portfolio Report",
+                data=pdf_buffer,
+                file_name="Portfolio_Report.pdf",
+                mime="application/pdf"
+                ) 
                 plot_asset_prices(my_portfolio)
                 plot_risk_return(my_portfolio_returns)
-                plot_correlation_heatmap(my_portfolio_returns)
+                plot_correlation_heatmap(my_portfolio_returns) 
+                
 
 
 if __name__ == "__main__":

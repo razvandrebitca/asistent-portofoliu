@@ -43,7 +43,9 @@ translations = {
         "price_movement":"Historical price movement",
         "annual_risk":"Annual risk (Volatility)",
         "annual_return":"Annual return",
-        "risk_return":"Risk vs Return of selected assets"
+        "risk_return":"Risk vs Return of selected assets",
+        "report":"Portfolio Optimization Report",
+        "risk_tolerance":"Risk tolerance"
     },
     "Română": {
         "title": "Asistent de Analiză a Portofoliului",
@@ -89,6 +91,8 @@ translations = {
         "price_movement":"Mișcările istorice ale prețurilor",
         "annual_risk":"Risc anual (volatilitate)",
         "annual_return":"Câștig anual",
-        "risk_return":"Risc vs rentabilitatea activelor selectate"
+        "risk_return":"Risc vs rentabilitatea activelor selectate",
+        "report":"Raport de optimizare a portofoliului",
+        "risk_tolerance":"Toleranță risc"
     }
 }
