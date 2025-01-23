@@ -45,7 +45,8 @@ translations = {
         "annual_return":"Annual return",
         "risk_return":"Risk vs Return of selected assets",
         "report":"Portfolio Optimization Report",
-        "risk_tolerance":"Risk tolerance"
+        "risk_tolerance":"Risk tolerance",
+        "optimizing":"Optimizing"
     },
     "Română": {
         "title": "Asistent de Analiză a Portofoliului",
@@ -93,6 +94,7 @@ translations = {
         "annual_return":"Câștig anual",
         "risk_return":"Risc vs rentabilitatea activelor selectate",
         "report":"Raport de optimizare a portofoliului",
-        "risk_tolerance":"Toleranță risc"
+        "risk_tolerance":"Toleranță risc",
+        "optimizing":"Optimizare"
     }
 }
