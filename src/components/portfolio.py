@@ -9,7 +9,8 @@ from translations import translations
 import yfinance as yf
 from fpdf import FPDF
 import datetime as dt
-
+from src.utils.optimization import optimize_portfolio
+import io
 # # Generate Full PDF Report
 def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance, file_name="Portfolio_Report.pdf"):
     # Optimize Portfolio
@@ -43,7 +44,7 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     pdf.set_font("Arial", size=12)
     
     # Title
-    pdf.cell(200, 10, txt=t['report'], ln=True, align='C')
+    pdf.cell(200, 10, txt="Report", ln=True, align='C')
     pdf.ln(10)
     
     # Allocation
@@ -127,7 +128,7 @@ def plot_correlation_heatmap(my_portfolio_returns):
     plt.title("Correlation Matrix of Selected Assets")
     st.pyplot(plt)
 
-def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover,risk_free_rate,start_date,end_date, language):
+def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover,risk_free_rate,selected_assets,portfolio_amount,risk_tolerance,start_date,end_date,language):
     t = translations[language]
     df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
     df_allocation['Price per Share'] = '$' + latest_price.round(2).astype(str)
@@ -156,74 +157,44 @@ def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, lates
                 
     st.markdown(
         f"""
-        <div style="margin-top:20px; font-size: 16px;">
         {t['sharpe_ratio']} {sharpe_ratio:.2f}
-        <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
-            title="{t['tooltip_sharpe']}">
-            ℹ
-        </span>
-        </div>
         """,
-        unsafe_allow_html=True
+        help = f"{t['tooltip_sharpe']}"
         )
 
     st.markdown(
     f"""
-    <div style="margin-top:20px; font-size: 16px;">
     {t['sortino_ratio']} {sortino_ratio:.2f}
-    <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
-            title="{t['tooltip_sortino']}">
-            ℹ
-    </span>
-    </div>
     """,
-    unsafe_allow_html=True
+    help = f"{t['tooltip_sortino']}"
     )
     st.markdown(
     f"""
-    <div style="margin-top:20px; font-size: 16px;">
     {t['max_drawdown']} {max_drawdown:.2%}
-    <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
-            title="{t['tooltip_max']}">
-            ℹ
-    </span>
-    </div>
     """,
-    unsafe_allow_html=True
+    help = f"{t['tooltip_max']}"
     )
 
     st.markdown(
     f"""
-    <div style="margin-top:20px;font-size: 16px;">
     {t['portfolio_beta']} {beta:.2f}
-    <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
-            title="{t['tooltip_beta']}">
-            ℹ
-    </span>
-    </div>
     """,
-    unsafe_allow_html=True
+    help = f"{t['tooltip_beta']}"
     )
 
     st.markdown(
     f"""
-    <div style="margin-top:20px; font-size: 16px;">
     {t['treynor_ratio']} {treynor_ratio:.2f}
-    <span style="color: gray; cursor: pointer; border: 1px solid #ddd; padding: 5px; border-radius: 5px;"
-            title="{t['tooltip_treynor']}">
-            ℹ
-    </span>
-    </div>
     """,
-    unsafe_allow_html=True
+    help = f"{t['tooltip_treynor']}"
     )
-    # pdf_buffer = generate_full_pdf_report(selected_tickers, start_date, end_date, portfolio_amount, risk_free_rate,risk_tolerance)
-    # st.download_button(
-    # label="Download Report",
-    # data=pdf_buffer,
-    # file_name="Portfolio_Report.pdf",
-    # mime="application/pdf"
-    # ) 
+    pdf_buffer = generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate,risk_tolerance)
+    st.download_button(
+    label="Download Report",
+    data=pdf_buffer,
+    file_name="Portfolio_Report.pdf",
+    mime="application/pdf"
+    ) 
     plot_asset_prices(my_portfolio)
     plot_risk_return(my_portfolio_returns)
     plot_correlation_heatmap(my_portfolio_returns) 

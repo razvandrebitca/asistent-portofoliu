@@ -32,7 +32,7 @@ def main():
                 settings["portfolio_amount"],
                 settings["risk_tolerance"]
             )
-         display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover,settings["risk_free_rate"],settings["start_date"],settings["end_date"],language)
+         display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover,settings["risk_free_rate"],settings["selected_tickers"],settings["portfolio_amount"],settings["risk_tolerance"],settings["start_date"],settings["end_date"],language)
 
 if __name__ == "__main__":
     main()
