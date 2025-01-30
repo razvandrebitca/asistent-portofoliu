@@ -4,9 +4,15 @@ from src.utils.data import get_sp500_tickers
 
 def create_sidebar(t):
     with st.sidebar:
+        st.header(t["settings_header"])
+
+
         theme = st.radio(t["theme"], ("Dark", "Light"))
+        # Date range selection
+        st.subheader(t["date_range_header"])
         start_date = st.date_input(t["start_date"], dt.datetime(2020, 1, 1))
         end_date = st.date_input(t["end_date"], dt.datetime.now())
+        # Ticker selection
         tickers = get_sp500_tickers()
         selected_tickers = st.multiselect(
         t['select_assets'], 
@@ -40,9 +46,8 @@ def create_sidebar(t):
 
          except Exception as e:
           st.sidebar.error(f"{t['error']}: {e}")
-
         portfolio_amount = st.number_input(t["portfolio_amount"], min_value=1000.0)
-        risk_free_rate = st.number_input(t['risk_free_rate'],  min_value=0.0,  max_value=10.0,  step=0.1,  value=1.0) / 100
+       # risk_free_rate = st.number_input(t['risk_free_rate'],  min_value=0.0,  max_value=10.0,  step=0.1,  value=1.0) / 100
         risk_tolerance = st.radio(t["risk_tolerance"], ("Low", "Medium", "High"))
         
         
@@ -52,6 +57,6 @@ def create_sidebar(t):
         "end_date": end_date,
         "portfolio_amount": portfolio_amount,
         "risk_tolerance": risk_tolerance,
-        "risk_free_rate": risk_free_rate,
+        "risk_free_rate": 1, # risk_free_rate,
         "selected_tickers": selected_tickers
     }

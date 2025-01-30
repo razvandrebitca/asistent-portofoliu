@@ -7,3 +7,4 @@ seaborn
 pyportfolioopt
 scikit-learn
 datetime
+fpdf

@@ -4,6 +4,33 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
+# Calculate portfolio return
+def calculate_portfolio_return(weights, mean_returns):
+    return np.sum(weights * mean_returns)
+
+# Calculate portfolio volatility
+def calculate_portfolio_volatility(weights, cov_matrix):
+    return np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
+
+# Calculate Sharpe ratio
+def calculate_sharpe_ratio(weights, mean_returns, cov_matrix, risk_free_rate):
+    portfolio_return = calculate_portfolio_return(weights, mean_returns)
+    portfolio_volatility = calculate_portfolio_volatility(weights, cov_matrix)
+    return (portfolio_return - risk_free_rate) / portfolio_volatility
+
+# Optimize portfolio for maximum Sharpe ratio
+def optimize_portfolio(mean_returns, cov_matrix, risk_free_rate):
+    num_assets = len(mean_returns)
+    args = (mean_returns, cov_matrix, risk_free_rate)
+    constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
+    bounds = tuple((0, 1) for asset in range(num_assets))
+    result = minimize(lambda weights: -calculate_sharpe_ratio(weights, *args), 
+                      num_assets * [1. / num_assets,], 
+                      method='SLSQP', 
+                      bounds=bounds, 
+                      constraints=constraints)
+    return result.x
+
 # Fetch data from Yahoo Finance
 def fetch_data(tickers, start_date, end_date):
     data = yf.download(tickers, start=start_date, end=end_date)
@@ -59,9 +86,7 @@ class EfficientFrontier:
             initial_guess = [1. / self.num_assets] * self.num_assets
             
             result = minimize(min_volatility, initial_guess, method='SLSQP', bounds=bounds, constraints=constraints)
-            portfolio_return, portfolio_volatility = self.portfolio_performance(result.x)
-            volatilities.append(portfolio_volatility)
-        
+            volatilities.append(result.fun)
         return volatilities
 
 # Main script

@@ -21,7 +21,9 @@ def main():
     # Main content
     st.title(t["title"])
     st.markdown("---")
-    
+    st.subheader(t["description"])
+    st.info(t['description_text'])
+    st.markdown("---")
     # Portfolio optimization
     if st.sidebar.button(t["optimize_button"]):
         with st.spinner(t["optimizing"]):
