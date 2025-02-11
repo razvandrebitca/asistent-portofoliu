@@ -6,7 +6,6 @@ def create_sidebar(t):
     with st.sidebar:
         st.header(t["settings_header"])
 
-
         theme = st.radio(t["theme"], ("Dark", "Light"))
         # Date range selection
         st.subheader(t["date_range_header"])
@@ -15,10 +14,10 @@ def create_sidebar(t):
         # Ticker selection
         tickers = get_sp500_tickers()
         selected_tickers = st.multiselect(
-        t['select_assets'], 
-        list(tickers.keys()), 
-        format_func=lambda ticker: f"{ticker}: {tickers[ticker]}"
-          )
+            t['select_assets'], 
+            list(tickers.keys()), 
+            format_func=lambda ticker: f"{ticker}: {tickers[ticker]}"
+        )
         # Input for custom ticker symbols
         custom_tickers = st.text_input(t['custom_tickers'])
 
@@ -26,7 +25,7 @@ def create_sidebar(t):
             custom_tickers_list = [ticker.strip() for ticker in custom_tickers.split(',')]
             selected_tickers.extend(custom_tickers_list)
 
-     # Input for cryptocurrencies
+        # Input for cryptocurrencies
         crypto_symbols = st.text_input(t['crypto_symbols'])
 
         if crypto_symbols:
@@ -36,20 +35,26 @@ def create_sidebar(t):
         # File uploader for tickers
         uploaded_file = st.file_uploader(t['upload'], type=["csv", "txt"])
         if uploaded_file is not None:
-         try:
-            if uploaded_file.name.endswith("csv"):
-                file_tickers = pd.read_csv(uploaded_file, header=None).iloc[:, 0].tolist()
-            else:
-             file_tickers = uploaded_file.read().decode("utf-8").splitlines()
-             selected_tickers.extend([ticker.strip() for ticker in file_tickers if ticker.strip()])
-             st.sidebar.success(t['success'])
+            try:
+                if uploaded_file.name.endswith("csv"):
+                    file_tickers = pd.read_csv(uploaded_file, header=None).iloc[:, 0].tolist()
+                else:
+                    file_tickers = uploaded_file.read().decode("utf-8").splitlines()
+                selected_tickers.extend([ticker.strip() for ticker in file_tickers if ticker.strip()])
+                st.sidebar.success(t['success'])
+            except Exception as e:
+                st.sidebar.error(f"{t['error']}: {e}")
 
-         except Exception as e:
-          st.sidebar.error(f"{t['error']}: {e}")
         portfolio_amount = st.number_input(t["portfolio_amount"], min_value=1000.0)
-       # risk_free_rate = st.number_input(t['risk_free_rate'],  min_value=0.0,  max_value=10.0,  step=0.1,  value=1.0) / 100
         risk_tolerance = st.radio(t["risk_tolerance"], ("Low", "Medium", "High"))
-        
+
+        # Choose between optimization from optimization.py or model.py
+        optimization_choice = st.radio(t["optimization_choice"], ("PyPortfolioOpt", "Linear Regression"))
+
+        if optimization_choice == "PyPortfolioOpt":
+             selected_optimization = "optimization"
+        else:
+            selected_optimization = "model"
         
     return {
         "theme": theme,
@@ -58,5 +63,6 @@ def create_sidebar(t):
         "portfolio_amount": portfolio_amount,
         "risk_tolerance": risk_tolerance,
         "risk_free_rate": 1, # risk_free_rate,
-        "selected_tickers": selected_tickers
+        "selected_tickers": selected_tickers,
+        "selected_optimization": selected_optimization
     }

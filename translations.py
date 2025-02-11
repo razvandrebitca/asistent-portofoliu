@@ -49,6 +49,7 @@ translations = {
         "optimizing":"Optimizing",
         "settings_header": "Settings",
         "date_range_header": "Date Range",
+        "optimization_choice": "Optimization Method",
     },
     "Română": {
         "title": "Asistent de Analiză a Portofoliului",
@@ -100,5 +101,6 @@ translations = {
         "optimizing":"Optimizare",
         "settings_header": "Setări",
         "date_range_header": "Interval de Date",
+        "optimization_choice": "Metoda optimizare"
     }
 }

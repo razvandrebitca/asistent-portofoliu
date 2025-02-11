@@ -22,8 +22,6 @@ def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, 
         weights = ef.efficient_return(target_return=0.1)  # Target moderate return
     elif risk_tolerance == "High":
         weights = ef.max_sharpe()  # Optimizes for maximum Sharpe ratio
-    else:
-        weights = ef.max_sharpe()  # Default to max Sharpe ratio
 
     cleaned_weights = ef.clean_weights()
 

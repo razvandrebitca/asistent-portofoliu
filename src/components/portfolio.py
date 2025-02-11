@@ -89,7 +89,14 @@ def backtest_portfolio(portfolio_returns, benchmark_returns):
 
 # Function to calculate performance metrics
 def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate):
-    portfolio_returns = pd.Series(portfolio_returns)  # Convert to Pandas Series
+    # Ensure the portfolio and benchmark returns are aligned on the same dates
+    common_dates = portfolio_returns.index.intersection(benchmark_returns.index)
+    
+    # Align both series to the common dates
+    portfolio_returns = portfolio_returns.loc[common_dates]
+    benchmark_returns = benchmark_returns.loc[common_dates]
+
+    # Now calculate performance metrics
     sharpe_ratio = (portfolio_returns.mean() - risk_free_rate) / portfolio_returns.std() * np.sqrt(252)
     sortino_ratio = (portfolio_returns.mean() - risk_free_rate) / portfolio_returns[portfolio_returns < 0].std() * np.sqrt(252)
     cumulative_returns = (1 + portfolio_returns).cumprod()
@@ -102,6 +109,7 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
     treynor_ratio = (portfolio_returns.mean() - risk_free_rate) / beta
 
     return sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio
+
 
 def plot_asset_prices(portfolio_data):
     st.subheader("Historical Price Movement")
@@ -128,73 +136,94 @@ def plot_correlation_heatmap(my_portfolio_returns):
     plt.title("Correlation Matrix of Selected Assets")
     st.pyplot(plt)
 
-def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover,risk_free_rate,selected_assets,portfolio_amount,risk_tolerance,start_date,end_date,language):
+def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover, risk_free_rate, selected_assets, portfolio_amount, risk_tolerance, start_date, end_date, language):
     t = translations[language]
+    
+    # Convert allocation dictionary to a DataFrame
     df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
+    
+    # Add Price per Share and Cost columns
     df_allocation['Price per Share'] = '$' + latest_price.round(2).astype(str)
-    df_allocation['Cost'] = '$' + (df_allocation['Shares'] * latest_price).round(2).astype(str) 
-    # Display metrics
+    df_allocation['Cost'] = '$' + (df_allocation['Shares'] * latest_price).round(2).astype(str)
+    
+    # Handle NaN values in 'Shares' column (replace with 0 and cast to int)
+    df_allocation['Shares'] = df_allocation['Shares'].fillna(0).astype(int)
+
+    # Display metrics in columns
     col1, col2, col3 = st.columns(3)
+    
     with col1:
         st.subheader(t['allocated_funds'])
         st.dataframe(df_allocation)
-        st.subheader(t['remaining_funds']+" ${:.2f}".format(leftover))
+        st.subheader(t['remaining_funds'] + " ${:.2f}".format(leftover))
+    
     with col2:
-        st.subheader(t['optimized_portfolio'])          
+        st.subheader(t['optimized_portfolio'])
+        
+        # Generate color palette for pie chart
         colors = sns.color_palette('Set3', len(df_allocation))
+        
+        # Create an explode array to emphasize the largest slice (optional)
         explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
+        
+        # Create the pie chart
         plt.figure(figsize=(8, 8))
         plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
-        plt.axis('equal')
+        plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
         st.pyplot(plt)
-
+    
+    # Retrieve and calculate benchmark data (S&P 500)
     sp500_prices = get_sp500_prices(start_date, end_date)
     sp500_returns = sp500_prices.pct_change().dropna()
     portfolio_returns = my_portfolio_returns.mean(axis=1)
+    
+    # Backtest portfolio against the S&P 500
     backtest_portfolio(my_portfolio_returns.mean(axis=1), sp500_returns)
+    
+    # Calculate performance metrics
     sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio = calculate_performance_metrics(portfolio_returns, sp500_returns, risk_free_rate)
+    
+    # Display performance metrics
     st.subheader(t['portfolio_metrics'])
                 
     st.markdown(
-        f"""
-        {t['sharpe_ratio']} {sharpe_ratio:.2f}
-        """,
-        help = f"{t['tooltip_sharpe']}"
-        )
-
-    st.markdown(
-    f"""
-    {t['sortino_ratio']} {sortino_ratio:.2f}
-    """,
-    help = f"{t['tooltip_sortino']}"
-    )
-    st.markdown(
-    f"""
-    {t['max_drawdown']} {max_drawdown:.2%}
-    """,
-    help = f"{t['tooltip_max']}"
+        f"{t['sharpe_ratio']} {sharpe_ratio:.2f}",
+        help=f"{t['tooltip_sharpe']}"
     )
 
     st.markdown(
-    f"""
-    {t['portfolio_beta']} {beta:.2f}
-    """,
-    help = f"{t['tooltip_beta']}"
+        f"{t['sortino_ratio']} {sortino_ratio:.2f}",
+        help=f"{t['tooltip_sortino']}"
+    )
+    
+    st.markdown(
+        f"{t['max_drawdown']} {max_drawdown:.2%}",
+        help=f"{t['tooltip_max']}"
     )
 
     st.markdown(
-    f"""
-    {t['treynor_ratio']} {treynor_ratio:.2f}
-    """,
-    help = f"{t['tooltip_treynor']}"
+        f"{t['portfolio_beta']} {beta:.2f}",
+        help=f"{t['tooltip_beta']}"
     )
-    pdf_buffer = generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate,risk_tolerance)
+
+    st.markdown(
+        f"{t['treynor_ratio']} {treynor_ratio:.2f}",
+        help=f"{t['tooltip_treynor']}"
+    )
+    
+    # Generate full PDF report
+    pdf_buffer = generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance)
+    
+    # Display download button for the PDF report
     st.download_button(
-    label="Download Report",
-    data=pdf_buffer,
-    file_name="Portfolio_Report.pdf",
-    mime="application/pdf"
+        label="Download Report",
+        data=pdf_buffer,
+        file_name="Portfolio_Report.pdf",
+        mime="application/pdf"
     ) 
+    
+    # Plot other asset-related charts
     plot_asset_prices(my_portfolio)
     plot_risk_return(my_portfolio_returns)
-    plot_correlation_heatmap(my_portfolio_returns) 
+    plot_correlation_heatmap(my_portfolio_returns)
+

@@ -39,5 +39,20 @@ def apply_theme(theme):
                 background-color: #f8f9fa;
                 color: black;
             }
+            h1{
+                color: black;
+            }
+            .st-de {
+             color: rgb(0 162 251);
+            }
+            h3{
+                color: black;
+            }
+            p{
+                color: black;
+            }
+            .st-emotion-cache-1itdyc2 {
+                background-color: rgb(232 232 234);
+            }
         </style>
         """
