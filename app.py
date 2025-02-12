@@ -7,7 +7,7 @@ from model import optimize_portfolio as optimize_portfolio_model
 from translations import translations
 
 def main():
-    st.set_page_config(page_title="Portfolio Analysis Assistant", layout="wide")
+    st.set_page_config(page_title="Portfolio Analysis Assistant", page_icon="voice.png",layout="wide")
     
     # Language selection
     language = st.sidebar.radio("Language / Limba:", ("English", "Română"))

@@ -12,7 +12,8 @@ import datetime as dt
 from src.utils.optimization import optimize_portfolio
 import io
 # # Generate Full PDF Report
-def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance, file_name="Portfolio_Report.pdf"):
+def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance,language,file_name="Portfolio_Report.pdf"):
+    t = translations[language]
     # Optimize Portfolio
     my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover = optimize_portfolio(
         selected_assets, start_date, end_date, portfolio_amount, risk_tolerance
@@ -24,17 +25,16 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     portfolio_returns = my_portfolio_returns.mean(axis=1)
     
     # Calculate Performance Metrics
-    sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio = calculate_performance_metrics(
+    sharpe_ratio, sortino_ratio, max_drawdown, beta = calculate_performance_metrics(
         portfolio_returns, sp500_returns, risk_free_rate
     )
     
     # Prepare Data for PDF
     metrics = {
-        "Sharpe Ratio": f"{sharpe_ratio:.2f}",
-        "Sortino Ratio": f"{sortino_ratio:.2f}",
-        "Max Drawdown": f"{max_drawdown:.2%}",
-        "Beta": f"{beta:.2f}",
-        "Treynor Ratio": f"{treynor_ratio:.2f}"
+        f"{t['sharpe_ratio']}": f"{sharpe_ratio:.2f}",
+        f"{t['sortino_ratio']}": f"{sortino_ratio:.2f}",
+        f"{t['max_drawdown']}": f"{max_drawdown:.2%}",
+        f"{t['portfolio_beta']}": f"{beta:.2f}",
     }
     
     # Generate PDF
@@ -44,25 +44,25 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     pdf.set_font("Arial", size=12)
     
     # Title
-    pdf.cell(200, 10, txt="Report", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"{t['report']}", ln=True, align='C')
     pdf.ln(10)
     
     # Allocation
-    pdf.cell(200, 10, txt="Optimized Allocation", ln=True, align='L')
+    pdf.cell(200, 10, txt=f"{t['allocated_funds']}", ln=True, align='L')
     pdf.ln(5)
     for asset, shares in allocation.items():
         pdf.cell(200, 10, txt=f"{asset}: {shares} shares", ln=True, align='L')
     pdf.ln(10)
     
     # Metrics
-    pdf.cell(200, 10, txt="Performance Metrics", ln=True, align='L')
+    pdf.cell(200, 10, txt=f"{t['portfolio_metrics']}", ln=True, align='L')
     pdf.ln(5)
     for metric, value in metrics.items():
         pdf.cell(200, 10, txt=f"{metric}: {value}", ln=True, align='L')
     pdf.ln(10)
     
     # Remaining Funds
-    pdf.cell(200, 10, txt=f"Remaining Funds: ${leftover:.2f}", ln=True, align='L')
+    pdf.cell(200, 10, txt=f"{t['remaining_funds']} ${leftover:.2f}", ln=True, align='L')
     
     # Save PDF to Buffer
     pdf.output(dest="S").encode("latin1")
@@ -106,14 +106,54 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
 
     # Calculate Beta and Treynor Ratio
     beta = np.cov(portfolio_returns, benchmark_returns)[0, 1] / np.var(benchmark_returns)
-    treynor_ratio = (portfolio_returns.mean() - risk_free_rate) / beta
 
-    return sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio
+    return sharpe_ratio, sortino_ratio, max_drawdown, beta
 
 
 def plot_asset_prices(portfolio_data):
     st.subheader("Historical Price Movement")
     st.line_chart(portfolio_data)
+import numpy as np
+
+def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate):
+    if portfolio_returns.empty or benchmark_returns.empty:
+        raise ValueError("Portfolio or benchmark returns are empty. Check input data.")
+
+    # Ensure returns align on the same dates
+    common_dates = portfolio_returns.index.intersection(benchmark_returns.index)
+    portfolio_returns = portfolio_returns.loc[common_dates]
+    benchmark_returns = benchmark_returns.loc[common_dates]
+
+    # Convert annual risk-free rate to daily (assuming 252 trading days)
+    daily_risk_free_rate = (1 + risk_free_rate) ** (1/252) - 1
+
+    # Excess return over risk-free rate
+    excess_returns = portfolio_returns - daily_risk_free_rate
+
+    # Sharpe Ratio (Risk-Adjusted Return)
+    sharpe_ratio = excess_returns.mean() / (excess_returns.std() + 1e-8) * np.sqrt(252)  # Avoid div-by-zero
+
+    # Sortino Ratio (Downside Risk-Adjusted Return)
+    downside_returns = portfolio_returns[portfolio_returns < 0]
+    downside_std = downside_returns.std() + 1e-8  # Avoid div-by-zero
+    sortino_ratio = excess_returns.mean() / downside_std * np.sqrt(252)
+
+    # Maximum Drawdown (Worst Peak-to-Trough Loss)
+    cumulative_returns = (1 + portfolio_returns).cumprod()
+    rolling_max = cumulative_returns.cummax()
+    drawdown = (cumulative_returns - rolling_max) / rolling_max
+    max_drawdown = drawdown.min()
+
+    # Beta Calculation (Covariance of portfolio & market / Variance of market)
+    cov_matrix = np.cov(portfolio_returns, benchmark_returns)
+    if cov_matrix.shape == (2, 2) and np.var(benchmark_returns) > 0:
+        beta = cov_matrix[0, 1] / np.var(benchmark_returns)
+    else:
+        beta = np.nan  # Handle cases where beta cannot be computed
+
+
+
+    return sharpe_ratio, sortino_ratio, max_drawdown, beta
 
 def plot_risk_return(my_portfolio_returns):
     st.subheader("Risk vs Return Analysis")
@@ -181,7 +221,7 @@ def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, lates
     backtest_portfolio(my_portfolio_returns.mean(axis=1), sp500_returns)
     
     # Calculate performance metrics
-    sharpe_ratio, sortino_ratio, max_drawdown, beta, treynor_ratio = calculate_performance_metrics(portfolio_returns, sp500_returns, risk_free_rate)
+    sharpe_ratio, sortino_ratio, max_drawdown, beta = calculate_performance_metrics(portfolio_returns, sp500_returns, risk_free_rate)
     
     # Display performance metrics
     st.subheader(t['portfolio_metrics'])
@@ -206,13 +246,9 @@ def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, lates
         help=f"{t['tooltip_beta']}"
     )
 
-    st.markdown(
-        f"{t['treynor_ratio']} {treynor_ratio:.2f}",
-        help=f"{t['tooltip_treynor']}"
-    )
     
     # Generate full PDF report
-    pdf_buffer = generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance)
+    pdf_buffer = generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance,language)
     
     # Display download button for the PDF report
     st.download_button(
@@ -226,4 +262,3 @@ def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, lates
     plot_asset_prices(my_portfolio)
     plot_risk_return(my_portfolio_returns)
     plot_correlation_heatmap(my_portfolio_returns)
-
