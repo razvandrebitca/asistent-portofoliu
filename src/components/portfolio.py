@@ -2,7 +2,6 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 import numpy as np
-import streamlit as st
 import seaborn as sns
 import matplotlib.pyplot as plt
 from translations import translations
@@ -11,8 +10,9 @@ from fpdf import FPDF
 import datetime as dt
 from src.utils.optimization import optimize_portfolio
 import io
-# # Generate Full PDF Report
-def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance,language,file_name="Portfolio_Report.pdf"):
+
+# Generate Full PDF Report
+def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance, language, file_name="Portfolio_Report.pdf"):
     t = translations[language]
     # Optimize Portfolio
     my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover = optimize_portfolio(
@@ -26,7 +26,7 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     
     # Calculate Performance Metrics
     sharpe_ratio, sortino_ratio, max_drawdown, beta = calculate_performance_metrics(
-        portfolio_returns, sp500_returns, risk_free_rate
+        portfolio_returns, sp500_returns, risk_free_rate,language
     )
     
     # Prepare Data for PDF
@@ -71,53 +71,70 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     
     return pdf_buffer
 
+def monte_carlo_simulation(my_portfolio_returns, num_simulations, num_days,language):
+    """
+    Monte Carlo simulation to estimate future portfolio return distributions.
+    
+    Parameters:
+    - my_portfolio_returns (pd.Series): Historical portfolio returns.
+    - num_simulations (int): Number of simulations to run.
+    - num_days (int): Number of days to project forward (default: 252 trading days in a year).
+    
+    Returns:
+    - Plots a histogram of simulated future portfolio returns.
+    """
+    t = translations[language]
+    # Calculate mean and standard deviation of daily returns
+    mean_return = my_portfolio_returns.mean()
+    std_dev = my_portfolio_returns.std()
+    
+    # Generate random daily returns using a normal distribution
+    simulated_returns = np.random.normal(mean_return, std_dev, (num_simulations, num_days))
+    
+    # Compute cumulative returns over the simulated period
+    cumulative_returns = (1 + simulated_returns).cumprod(axis=1)
+    
+    # Final portfolio values at the end of simulation period
+    final_returns = cumulative_returns[:, -1] - 1  # Extract the final portfolio return
+    
+    # Plot histogram of simulated portfolio returns
+    st.subheader(t['monte_carlo_title'])
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.histplot(final_returns, bins=50, kde=True, color="blue", alpha=0.7)
+    ax.axvline(final_returns.mean(), color="red", linestyle="dashed", linewidth=2, label="Mean Expected Return")
+    ax.axvline(np.percentile(final_returns, 5), color="orange", linestyle="dashed", linewidth=2, label="5th Percentile (Worst Case)")
+    ax.axvline(np.percentile(final_returns, 95), color="green", linestyle="dashed", linewidth=2, label="95th Percentile (Best Case)")
+    
+    plt.xlabel(t['sim_return'])
+    plt.ylabel("Frequency")
+    plt.title(t['monte_carlo_title'])
+    plt.legend()
+    
+    st.pyplot(fig)
+
+
 # Function to retrieve S&P 500 price data
 def get_sp500_prices(start_date, end_date):
     sp500_data = yf.download('^GSPC', start=start_date, end=end_date)
     sp500_prices = sp500_data['Adj Close']
     return sp500_prices
 
-def backtest_portfolio(portfolio_returns, benchmark_returns):
+def backtest_portfolio(portfolio_returns, benchmark_returns,language):
+    t = translations[language]
     cumulative_portfolio = (1 + portfolio_returns).cumprod()
     cumulative_benchmark = (1 + benchmark_returns).cumprod()
     plt.figure(figsize=(10, 6))
     plt.plot(cumulative_portfolio, label="Portfolio", color="green")
     plt.plot(cumulative_benchmark, label="Benchmark (S&P 500)", color="orange")
     plt.legend()
-    plt.title("S&P 500 vs. Optimized Portfolio")
+    plt.title(t['portfolio_vs_sp500'])
     st.pyplot(plt)
 
 # Function to calculate performance metrics
-def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate):
-    # Ensure the portfolio and benchmark returns are aligned on the same dates
-    common_dates = portfolio_returns.index.intersection(benchmark_returns.index)
-    
-    # Align both series to the common dates
-    portfolio_returns = portfolio_returns.loc[common_dates]
-    benchmark_returns = benchmark_returns.loc[common_dates]
-
-    # Now calculate performance metrics
-    sharpe_ratio = (portfolio_returns.mean() - risk_free_rate) / portfolio_returns.std() * np.sqrt(252)
-    sortino_ratio = (portfolio_returns.mean() - risk_free_rate) / portfolio_returns[portfolio_returns < 0].std() * np.sqrt(252)
-    cumulative_returns = (1 + portfolio_returns).cumprod()
-    peak = cumulative_returns.cummax()
-    drawdown = (cumulative_returns - peak) / peak
-    max_drawdown = drawdown.min()
-
-    # Calculate Beta and Treynor Ratio
-    beta = np.cov(portfolio_returns, benchmark_returns)[0, 1] / np.var(benchmark_returns)
-
-    return sharpe_ratio, sortino_ratio, max_drawdown, beta
-
-
-def plot_asset_prices(portfolio_data):
-    st.subheader("Historical Price Movement")
-    st.line_chart(portfolio_data)
-import numpy as np
-
-def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate):
+def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate,language):
+    t = translations[language]
     if portfolio_returns.empty or benchmark_returns.empty:
-        raise ValueError("Portfolio or benchmark returns are empty. Check input data.")
+        raise ValueError(t['empty_error'])
 
     # Ensure returns align on the same dates
     common_dates = portfolio_returns.index.intersection(benchmark_returns.index)
@@ -125,18 +142,18 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
     benchmark_returns = benchmark_returns.loc[common_dates]
 
     # Convert annual risk-free rate to daily (assuming 252 trading days)
-    daily_risk_free_rate = (1 + risk_free_rate) ** (1/252) - 1
+    daily_risk_free_rate = (1 + risk_free_rate) ** (1 / 252) - 1
 
     # Excess return over risk-free rate
     excess_returns = portfolio_returns - daily_risk_free_rate
 
     # Sharpe Ratio (Risk-Adjusted Return)
-    sharpe_ratio = excess_returns.mean() / (excess_returns.std() + 1e-8) * np.sqrt(252)  # Avoid div-by-zero
+    sharpe_ratio = excess_returns.mean() * np.sqrt(252) / (excess_returns.std() + 1e-8)  # Avoid div-by-zero
 
     # Sortino Ratio (Downside Risk-Adjusted Return)
     downside_returns = portfolio_returns[portfolio_returns < 0]
     downside_std = downside_returns.std() + 1e-8  # Avoid div-by-zero
-    sortino_ratio = excess_returns.mean() / downside_std * np.sqrt(252)
+    sortino_ratio = excess_returns.mean() * np.sqrt(252) / downside_std
 
     # Maximum Drawdown (Worst Peak-to-Trough Loss)
     cumulative_returns = (1 + portfolio_returns).cumprod()
@@ -150,13 +167,18 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
         beta = cov_matrix[0, 1] / np.var(benchmark_returns)
     else:
         beta = np.nan  # Handle cases where beta cannot be computed
-
-
-
+    
     return sharpe_ratio, sortino_ratio, max_drawdown, beta
 
-def plot_risk_return(my_portfolio_returns):
-    st.subheader("Risk vs Return Analysis")
+
+def plot_asset_prices(portfolio_data,language):
+    t = translations[language]
+    st.subheader(t['price_movement'])
+    st.line_chart(portfolio_data)
+
+def plot_risk_return(my_portfolio_returns,language):
+    t = translations[language]
+    st.subheader(t['risk_return'])
     asset_means = my_portfolio_returns.mean() * 252
     asset_vols = my_portfolio_returns.std() * np.sqrt(252)
     plt.figure(figsize=(10, 6))
@@ -168,12 +190,13 @@ def plot_risk_return(my_portfolio_returns):
     plt.title("Risk vs Return of Selected Assets")
     st.pyplot(plt)
 
-def plot_correlation_heatmap(my_portfolio_returns):
-    st.subheader("Heatmap")
+def plot_correlation_heatmap(my_portfolio_returns,language):
+    t = translations[language]
+    st.subheader(t['heatmap'])
     corr_matrix = my_portfolio_returns.corr()
     plt.figure(figsize=(10, 8))
     sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
-    plt.title("Correlation Matrix of Selected Assets")
+    plt.title(t['correlation_heatmap'])
     st.pyplot(plt)
 
 def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover, risk_free_rate, selected_assets, portfolio_amount, risk_tolerance, start_date, end_date, language):
@@ -191,74 +214,73 @@ def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, lates
 
     # Display metrics in columns
     col1, col2, col3 = st.columns(3)
-    
+
+    # Portfolio allocation with collapsible section
     with col1:
-        st.subheader(t['allocated_funds'])
-        st.dataframe(df_allocation)
-        st.subheader(t['remaining_funds'] + " ${:.2f}".format(leftover))
-    
+        with st.expander(t['allocated_funds']):
+            st.dataframe(df_allocation)
+            st.write(f"{t['remaining_funds']} ${leftover:.2f}")
+
+    # Portfolio metrics with collapsible section
     with col2:
-        st.subheader(t['optimized_portfolio'])
-        
-        # Generate color palette for pie chart
-        colors = sns.color_palette('Set3', len(df_allocation))
-        
-        # Create an explode array to emphasize the largest slice (optional)
-        explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
-        
-        # Create the pie chart
-        plt.figure(figsize=(8, 8))
-        plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
-        plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-        st.pyplot(plt)
-    
-    # Retrieve and calculate benchmark data (S&P 500)
-    sp500_prices = get_sp500_prices(start_date, end_date)
-    sp500_returns = sp500_prices.pct_change().dropna()
-    portfolio_returns = my_portfolio_returns.mean(axis=1)
-    
-    # Backtest portfolio against the S&P 500
-    backtest_portfolio(my_portfolio_returns.mean(axis=1), sp500_returns)
-    
-    # Calculate performance metrics
-    sharpe_ratio, sortino_ratio, max_drawdown, beta = calculate_performance_metrics(portfolio_returns, sp500_returns, risk_free_rate)
-    
-    # Display performance metrics
-    st.subheader(t['portfolio_metrics'])
-                
-    st.markdown(
-        f"{t['sharpe_ratio']} {sharpe_ratio:.2f}",
-        help=f"{t['tooltip_sharpe']}"
-    )
+        with st.expander(t['portfolio_metrics']):
+            sharpe_ratio, sortino_ratio, max_drawdown, beta = calculate_performance_metrics(my_portfolio_returns.mean(axis=1), get_sp500_prices(start_date, end_date).pct_change().dropna(), risk_free_rate,language)
+            st.markdown(
+                f"{t['sharpe_ratio']} {sharpe_ratio:.2f}",
+                help=f"{t['tooltip_sharpe']}"
+            )
 
-    st.markdown(
-        f"{t['sortino_ratio']} {sortino_ratio:.2f}",
-        help=f"{t['tooltip_sortino']}"
-    )
-    
-    st.markdown(
-        f"{t['max_drawdown']} {max_drawdown:.2%}",
-        help=f"{t['tooltip_max']}"
-    )
+            st.markdown(
+                f"{t['sortino_ratio']} {sortino_ratio:.2f}",
+                help=f"{t['tooltip_sortino']}"
+            )
 
-    st.markdown(
-        f"{t['portfolio_beta']} {beta:.2f}",
-        help=f"{t['tooltip_beta']}"
-    )
+            st.markdown(
+                f"{t['max_drawdown']} {max_drawdown:.2%}",
+                help=f"{t['tooltip_max']}"
+            )
 
+            st.markdown(
+                f"{t['portfolio_beta']} {beta:.2f}",
+                help=f"{t['tooltip_beta']}"
+            )
+
+    # Pie chart with collapsible section
+    with col2:
+        with st.expander(t['optimized_portfolio']):
+            # Generate color palette for pie chart
+            colors = sns.color_palette('Set3', len(df_allocation))
+
+            # Create an explode array to emphasize the largest slice (optional)
+            explode = [0.05 if shares == max(df_allocation['Shares']) else 0 for shares in df_allocation['Shares']]
+
+            # Create the pie chart
+            plt.figure(figsize=(8, 8))
+            plt.pie(df_allocation['Shares'], labels=df_allocation.index, autopct='%1.1f%%', startangle=140, explode=explode, colors=colors)
+            plt.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+            st.pyplot(plt)
     
-    # Generate full PDF report
-    pdf_buffer = generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance,language)
+    # Generate full PDF report with a collapsible section
+    with st.expander("Download Portfolio Report"):
+        pdf_buffer = generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance, language)
+        
+        # Display download button for the PDF report
+        st.download_button(
+            label="Download Report",
+            data=pdf_buffer,
+            file_name="Portfolio_Report.pdf",
+            mime="application/pdf"
+        ) 
     
-    # Display download button for the PDF report
-    st.download_button(
-        label="Download Report",
-        data=pdf_buffer,
-        file_name="Portfolio_Report.pdf",
-        mime="application/pdf"
-    ) 
-    
-    # Plot other asset-related charts
-    plot_asset_prices(my_portfolio)
-    plot_risk_return(my_portfolio_returns)
-    plot_correlation_heatmap(my_portfolio_returns)
+    # Plot other asset-related charts in collapsible sections
+    with st.expander("Historical Price Movement"):
+        plot_asset_prices(my_portfolio,language)
+
+    with st.expander("Risk vs Return Analysis"):
+        plot_risk_return(my_portfolio_returns,language)
+
+    with st.expander("Correlation Matrix of Selected Assets"):
+        plot_correlation_heatmap(my_portfolio_returns,language)
+
+    with st.expander("Monte Carlo Simulation: Future Return Analysis"):
+     monte_carlo_simulation(my_portfolio_returns.mean(axis=1), num_simulations=1000, num_days=252,language=language)

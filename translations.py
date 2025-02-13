@@ -50,6 +50,10 @@ translations = {
         "date_range_header": "Date Range",
         "optimization_choice": "Optimization Method",
         "report":"Report",
+        "monte_carlo_title":"Monte Carlo Simulation",
+        "sim_return":"Simulated return",
+        "frequency":"Frequency",
+        "empty_error":"Portfolio or benchmark returns are empty. Check input data."
     },
     "Română": {
         "title": "Asistent de Analiză a Portofoliului",
@@ -102,5 +106,9 @@ translations = {
         "date_range_header": "Interval de Date",
         "optimization_choice": "Metoda optimizare",
         "report":"Raport",
+        "monte_carlo_title":"Simulare Monte Carlo",
+        "sim_return":"Simulare randament",
+        "frequency":"Frecvență",
+        "empty_error":"Randamentele portofoliului sau ale benchmark-ului sunt goale. Verificați datele de intrare."
     }
 }
