@@ -10,10 +10,11 @@ from fpdf import FPDF
 import datetime as dt
 from src.utils.optimization import optimize_portfolio
 import io
-
+import base64
 # Generate Full PDF Report
 def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance, language, file_name="Portfolio_Report.pdf"):
-    t = translations[language]
+    t = translations[language]  # Assuming translations are defined elsewhere in your code
+    
     # Optimize Portfolio
     my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover = optimize_portfolio(
         selected_assets, start_date, end_date, portfolio_amount, risk_tolerance
@@ -26,7 +27,7 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     
     # Calculate Performance Metrics
     sharpe_ratio, sortino_ratio, max_drawdown, beta = calculate_performance_metrics(
-        portfolio_returns, sp500_returns, risk_free_rate,language
+        portfolio_returns, sp500_returns, risk_free_rate, language
     )
     
     # Prepare Data for PDF
@@ -40,8 +41,14 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     # Generate PDF
     pdf_buffer = io.BytesIO()
     pdf = FPDF()
+
+    # Load DejaVu font (make sure you have DejaVuSans.ttf and DejaVuSans-Bold.ttf in the correct folder)
+    pdf.add_font('DejaVu', '', 'DejaVuSans.ttf', uni=True)
+
+    
+    pdf.set_font("DejaVu", size=12)  # Use DejaVu font, which supports Romanian characters
+    
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
     
     # Title
     pdf.cell(200, 10, txt=f"{t['report']}", ln=True, align='C')
@@ -65,11 +72,12 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     pdf.cell(200, 10, txt=f"{t['remaining_funds']} ${leftover:.2f}", ln=True, align='L')
     
     # Save PDF to Buffer
-    pdf.output(dest="S").encode("latin1")
-    pdf_buffer.write(pdf.output(dest="S").encode("latin1"))
+    pdf_output = pdf.output(dest="S")  # This returns the PDF as a string
+    pdf_buffer.write(pdf_output.encode('latin1'))  # Encode the string as bytes before writing to the buffer
     pdf_buffer.seek(0)
     
     return pdf_buffer
+
 
 def monte_carlo_simulation(my_portfolio_returns, num_simulations, num_days,language):
     """
@@ -199,9 +207,21 @@ def plot_correlation_heatmap(my_portfolio_returns,language):
     plt.title(t['correlation_heatmap'])
     st.pyplot(plt)
 
+# Function to create a base64 download link for the PDF
+def get_download_link(pdf_data):
+    # Convert the BytesIO object to bytes and encode it to base64
+    pdf_bytes = pdf_data.getvalue()
+    b64 = base64.b64encode(pdf_bytes).decode()
+    return f'<a href="data:application/pdf;base64,{b64}" download="Portfolio_Report.pdf">📥</a>'
+
 def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, latest_price, allocation, leftover, risk_free_rate, selected_assets, portfolio_amount, risk_tolerance, start_date, end_date, language):
     t = translations[language]
-    
+    # Generate the PDF only if not already done
+    if "pdf_data" not in st.session_state:
+        st.session_state["pdf_data"] = generate_full_pdf_report(
+            selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance, language
+        )
+
     # Convert allocation dictionary to a DataFrame
     df_allocation = pd.DataFrame.from_dict(allocation, orient='index', columns=['Shares'])
     
@@ -226,22 +246,22 @@ def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, lates
         with st.expander(t['portfolio_metrics']):
             sharpe_ratio, sortino_ratio, max_drawdown, beta = calculate_performance_metrics(my_portfolio_returns.mean(axis=1), get_sp500_prices(start_date, end_date).pct_change().dropna(), risk_free_rate,language)
             st.markdown(
-                f"{t['sharpe_ratio']} {sharpe_ratio:.2f}",
+                f"{t['sharpe_ratio']}: {sharpe_ratio:.2f}",
                 help=f"{t['tooltip_sharpe']}"
             )
 
             st.markdown(
-                f"{t['sortino_ratio']} {sortino_ratio:.2f}",
+                f"{t['sortino_ratio']}: {sortino_ratio:.2f}",
                 help=f"{t['tooltip_sortino']}"
             )
 
             st.markdown(
-                f"{t['max_drawdown']} {max_drawdown:.2%}",
+                f"{t['max_drawdown']}: {max_drawdown:.2%}",
                 help=f"{t['tooltip_max']}"
             )
 
             st.markdown(
-                f"{t['portfolio_beta']} {beta:.2f}",
+                f"{t['portfolio_beta']}: {beta:.2f}",
                 help=f"{t['tooltip_beta']}"
             )
 
@@ -261,26 +281,18 @@ def display_portfolio(my_portfolio, my_portfolio_returns, cleaned_weights, lates
             st.pyplot(plt)
     
     # Generate full PDF report with a collapsible section
-    with st.expander("Download Portfolio Report"):
-        pdf_buffer = generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_amount, risk_free_rate, risk_tolerance, language)
-        
-        # Display download button for the PDF report
-        st.download_button(
-            label="Download Report",
-            data=pdf_buffer,
-            file_name="Portfolio_Report.pdf",
-            mime="application/pdf"
-        ) 
+    with st.expander(t['download_report']):
+        st.markdown(get_download_link(st.session_state["pdf_data"]), unsafe_allow_html=True) 
     
     # Plot other asset-related charts in collapsible sections
-    with st.expander("Historical Price Movement"):
+    with st.expander(t['price_movement']):
         plot_asset_prices(my_portfolio,language)
 
-    with st.expander("Risk vs Return Analysis"):
+    with st.expander(t['risk_return']):
         plot_risk_return(my_portfolio_returns,language)
 
-    with st.expander("Correlation Matrix of Selected Assets"):
+    with st.expander(t['correlation_matrix']):
         plot_correlation_heatmap(my_portfolio_returns,language)
 
-    with st.expander("Monte Carlo Simulation: Future Return Analysis"):
+    with st.expander(t['monte_carlo_title']):
      monte_carlo_simulation(my_portfolio_returns.mean(axis=1), num_simulations=1000, num_days=252,language=language)
