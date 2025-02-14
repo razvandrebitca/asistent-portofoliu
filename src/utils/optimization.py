@@ -7,16 +7,18 @@ from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance):
     my_portfolio = pd.DataFrame()
     for asset in selected_assets:
-        data = yf.download(asset, start=start_date, end=end_date)
-        if isinstance(data.columns, pd.MultiIndex):
-            # In case of multi-index columns, access 'Adj Close' appropriately
-            my_portfolio[asset] = data['Adj Close']
-        elif 'Adj Close' in data.columns:
-            my_portfolio[asset] = data['Adj Close']
-        else:
-            print(f"Warning: {asset} does not have 'Adj Close' data.")
-            my_portfolio[asset] = data.iloc[:, 0]  # Fallback to the first column (usually 'Close')
-            
+        try:
+            data = yf.download(asset, start=start_date, end=end_date)
+            if 'Adj Close' in data.columns:
+                my_portfolio[asset] = data['Adj Close']
+            else:
+                print(f"Warning: {asset} does not have 'Adj Close' data.")
+                my_portfolio[asset] = data.iloc[:, 0]  # Fallback to the first column (usually 'Close')
+        except Exception as e:
+            print(f"Error downloading {asset}: {e}")
+            # Handle the error (e.g., skip asset or add empty data)
+            my_portfolio[asset] = None 
+
     my_portfolio_returns = my_portfolio.pct_change().dropna()
     mu = expected_returns.mean_historical_return(my_portfolio)
     S = risk_models.sample_cov(my_portfolio)
