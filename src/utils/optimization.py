@@ -6,38 +6,16 @@ from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance):
     my_portfolio = pd.DataFrame()
+    sp500_prices = yf.download('^GSPC', start=start_date, end=end_date)
+
+    print("Downloaded DataFrame:")
+    print(sp500_prices.head())  # Print first few rows for debugging
+
+    if 'Adj Close' not in sp500_prices.columns:
+        raise ValueError("Yahoo Finance response does not contain 'Adj Close'. Check API response.")
+        
     for asset in selected_assets:
-        print(f"Downloading data for: {asset}")
-
-        try:
-            # Download data
-            data = yf.download(asset, start=start_date, end=end_date)
-
-            # Debugging: Print the first few rows and column names
-            print(f"Data for {asset}:\n{data.head()}\nColumns: {data.columns}")
-
-            # Handling MultiIndex Columns (if any)
-            if isinstance(data.columns, pd.MultiIndex):
-                if ('Adj Close', '') in data.columns:
-                    my_portfolio[asset] = data[('Adj Close', '')]
-                elif ('Adj Close', 'Adj Close') in data.columns:
-                    my_portfolio[asset] = data[('Adj Close', 'Adj Close')]
-                else:
-                    print(f"⚠️ Warning: {asset} does not have 'Adj Close' data (MultiIndex).")
-                    my_portfolio[asset] = data.iloc[:, 0]  # Fallback to the first column
-            elif 'Adj Close' in data.columns:
-                my_portfolio[asset] = data['Adj Close']
-            else:
-                print(f"⚠️ Warning: {asset} does not have 'Adj Close' data. Using 'Close' instead.")
-                if 'Close' in data.columns:
-                    my_portfolio[asset] = data['Close']
-                else:
-                    print(f"🚨 Error: No relevant data found for {asset}. Skipping.")
-                    my_portfolio[asset] = None  # Skip asset if no useful data is found
-
-        except Exception as e:
-            print(f"🚨 Error fetching data for {asset}: {e}")
-            my_portfolio[asset] = None  # Handle API failures gracefully
+        my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date)['Adj Close']
 
     my_portfolio_returns = my_portfolio.pct_change().dropna()
     mu = expected_returns.mean_historical_return(my_portfolio)
