@@ -7,17 +7,37 @@ from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance):
     my_portfolio = pd.DataFrame()
     for asset in selected_assets:
+        print(f"Downloading data for: {asset}")
+
         try:
+            # Download data
             data = yf.download(asset, start=start_date, end=end_date)
-            if 'Adj Close' in data.columns:
+
+            # Debugging: Print the first few rows and column names
+            print(f"Data for {asset}:\n{data.head()}\nColumns: {data.columns}")
+
+            # Handling MultiIndex Columns (if any)
+            if isinstance(data.columns, pd.MultiIndex):
+                if ('Adj Close', '') in data.columns:
+                    my_portfolio[asset] = data[('Adj Close', '')]
+                elif ('Adj Close', 'Adj Close') in data.columns:
+                    my_portfolio[asset] = data[('Adj Close', 'Adj Close')]
+                else:
+                    print(f"⚠️ Warning: {asset} does not have 'Adj Close' data (MultiIndex).")
+                    my_portfolio[asset] = data.iloc[:, 0]  # Fallback to the first column
+            elif 'Adj Close' in data.columns:
                 my_portfolio[asset] = data['Adj Close']
             else:
-                print(f"Warning: {asset} does not have 'Adj Close' data.")
-                my_portfolio[asset] = data.iloc[:, 0]  # Fallback to the first column (usually 'Close')
+                print(f"⚠️ Warning: {asset} does not have 'Adj Close' data. Using 'Close' instead.")
+                if 'Close' in data.columns:
+                    my_portfolio[asset] = data['Close']
+                else:
+                    print(f"🚨 Error: No relevant data found for {asset}. Skipping.")
+                    my_portfolio[asset] = None  # Skip asset if no useful data is found
+
         except Exception as e:
-            print(f"Error downloading {asset}: {e}")
-            # Handle the error (e.g., skip asset or add empty data)
-            my_portfolio[asset] = None 
+            print(f"🚨 Error fetching data for {asset}: {e}")
+            my_portfolio[asset] = None  # Handle API failures gracefully
 
     my_portfolio_returns = my_portfolio.pct_change().dropna()
     mu = expected_returns.mean_historical_return(my_portfolio)
