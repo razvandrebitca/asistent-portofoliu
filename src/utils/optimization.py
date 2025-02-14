@@ -6,14 +6,25 @@ from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance):
     my_portfolio = pd.DataFrame()
-    sp500_prices = yf.download('^GSPC', start=start_date, end=end_date)
+     sp500_prices = yf.download('^GSPC', start=start_date, end=end_date)
+    
+    print("🔍 Debugging: Yahoo Finance Response")
+    print(sp500_prices.head())  # Print the first few rows
 
-    print("Downloaded DataFrame:")
-    print(sp500_prices.head())  # Print first few rows for debugging
+    # Handle possible MultiIndex case
+    if isinstance(sp500_prices.columns, pd.MultiIndex):
+        print("⚠️ MultiIndex detected in columns:", sp500_prices.columns)
+        if ('Adj Close', '') in sp500_prices.columns:
+            sp500_prices = sp500_prices[('Adj Close', '')]  # Handle MultiIndex
+        elif ('^GSPC', 'Adj Close') in sp500_prices.columns:
+            sp500_prices = sp500_prices[('^GSPC', 'Adj Close')]
+        else:
+            raise ValueError("Unexpected column format in Yahoo Finance data.")
 
-    if 'Adj Close' not in sp500_prices.columns:
-        raise ValueError("Yahoo Finance response does not contain 'Adj Close'. Check API response.")
-        
+    # Handle missing 'Adj Close'
+    elif 'Adj Close' not in sp500_prices.columns:
+        raise ValueError(f"Yahoo Finance response does not contain 'Adj Close'. Columns received: {sp500_prices.columns}")
+
     for asset in selected_assets:
         my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date)['Adj Close']
 
