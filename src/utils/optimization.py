@@ -6,7 +6,7 @@ from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance):
     my_portfolio = pd.DataFrame()
-     sp500_prices = yf.download('^GSPC', start=start_date, end=end_date)
+    sp500_prices = yf.download('^GSPC', start=start_date, end=end_date)
     
     print("🔍 Debugging: Yahoo Finance Response")
     print(sp500_prices.head())  # Print the first few rows
