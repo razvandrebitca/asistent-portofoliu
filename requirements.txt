@@ -8,4 +8,4 @@ pyportfolioopt
 scikit-learn
 datetime
 fpdf
-yahooquery
+alpha_vantage
