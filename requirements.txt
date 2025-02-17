@@ -8,3 +8,4 @@ pyportfolioopt
 scikit-learn
 datetime
 fpdf
+lxml
