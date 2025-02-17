@@ -12,14 +12,21 @@ def fetch_stock_data(selected_assets, start_date, end_date, max_retries=3):
     for asset in selected_assets:
         for attempt in range(max_retries):
             try:
-                df = yf.download(asset, start=start_date, end=end_date, progress=False)
+                # Download stock data with auto_adjust=True (default)
+                df = yf.download(asset, start=start_date, end=end_date, progress=False, auto_adjust=True)
                 
-                if not df.empty:
+                # Check if 'Adj Close' is present, otherwise fall back to 'Close'
+                if 'Adj Close' in df.columns:
                     my_portfolio[asset] = df["Adj Close"]
-                    break  # Success, move to next stock
+                elif 'Close' in df.columns:
+                    my_portfolio[asset] = df["Close"]
                 else:
-                    print(f"⚠️ No data found for {asset}, attempt {attempt + 1}/{max_retries}")
+                    print(f"⚠️ No valid price data for {asset}, attempt {attempt + 1}/{max_retries}")
                     time.sleep(2)  # Wait before retrying
+                    continue  # Try next attempt for the same ticker
+                
+                # Successfully fetched the data
+                break  # Exit retry loop if data is fetched successfully
 
             except Exception as e:
                 print(f"❌ Error fetching {asset}: {e}")
@@ -55,16 +62,4 @@ def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, 
 
     return my_portfolio, my_portfolio_returns, cleaned_weights, latest_prices, allocation, leftover
 
-# Example Usage (For Cloud)
-if __name__ == "__main__":
-    selected_assets = ["AAPL", "MSFT", "GOOGL"]  # Example stocks
-    start_date = "2023-01-01"
-    end_date = "2024-01-01"
-    portfolio_amount = 10000
-    risk_tolerance = "Medium"
 
-    try:
-        result = optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance)
-        print("✅ Portfolio Optimization Successful!")
-    except Exception as e:
-        print(f"❌ Error: {e}")
