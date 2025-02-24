@@ -8,7 +8,7 @@ def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, 
     # Download historical data
     my_portfolio = pd.DataFrame()
     for asset in selected_assets:
-        my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date)['Adj Close']
+        my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date,auto_adjust=False)['Adj Close']
     
     # Calculate daily returns
     my_portfolio_returns = my_portfolio.pct_change().dropna()

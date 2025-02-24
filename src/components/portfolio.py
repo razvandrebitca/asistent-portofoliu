@@ -21,7 +21,7 @@ def generate_full_pdf_report(selected_assets, start_date, end_date, portfolio_am
     )
     
     # Retrieve Benchmark Data (S&P 500)
-    sp500_prices = yf.download('^GSPC', start=start_date, end=end_date)['Adj Close']
+    sp500_prices = yf.download('^GSPC', start=start_date, end=end_date,auto_adjust=False)['Adj Close']
     sp500_returns = sp500_prices.pct_change().dropna()
     portfolio_returns = my_portfolio_returns.mean(axis=1)
     
@@ -123,7 +123,7 @@ def monte_carlo_simulation(my_portfolio_returns, num_simulations, num_days,langu
 
 # Function to retrieve S&P 500 price data
 def get_sp500_prices(start_date, end_date):
-    sp500_data = yf.download('^GSPC', start=start_date, end=end_date)
+    sp500_data = yf.download('^GSPC', start=start_date, end=end_date,auto_adjust=False)
     sp500_prices = sp500_data['Adj Close']
     return sp500_prices
 
@@ -139,8 +139,9 @@ def backtest_portfolio(portfolio_returns, benchmark_returns,language):
     st.pyplot(plt)
 
 # Function to calculate performance metrics
-def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate,language):
+def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_free_rate, language):
     t = translations[language]
+    
     if portfolio_returns.empty or benchmark_returns.empty:
         raise ValueError(t['empty_error'])
 
@@ -170,13 +171,25 @@ def calculate_performance_metrics(portfolio_returns, benchmark_returns, risk_fre
     max_drawdown = drawdown.min()
 
     # Beta Calculation (Covariance of portfolio & market / Variance of market)
-    cov_matrix = np.cov(portfolio_returns, benchmark_returns)
-    if cov_matrix.shape == (2, 2) and np.var(benchmark_returns) > 0:
-        beta = cov_matrix[0, 1] / np.var(benchmark_returns)
+    if len(portfolio_returns) > 1 and len(benchmark_returns) > 1:
+        # Ensure both are 1D arrays (Series)
+        portfolio_returns = portfolio_returns.values.flatten()
+        benchmark_returns = benchmark_returns.values.flatten()
+        
+        # Check if lengths match
+        if len(portfolio_returns) == len(benchmark_returns):
+            cov_matrix = np.cov(portfolio_returns, benchmark_returns)
+            if cov_matrix.shape == (2, 2) and np.var(benchmark_returns) > 0:
+                beta = cov_matrix[0, 1] / np.var(benchmark_returns)
+            else:
+                beta = np.nan  # Handle cases where beta cannot be computed
+        else:
+            beta = np.nan  # Handle cases where data lengths don't match
     else:
-        beta = np.nan  # Handle cases where beta cannot be computed
-    
+        beta = np.nan  # Not enough data to compute beta
+
     return sharpe_ratio, sortino_ratio, max_drawdown, beta
+
 
 
 def plot_asset_prices(portfolio_data,language):

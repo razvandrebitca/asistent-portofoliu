@@ -7,7 +7,7 @@ from pypfopt.discrete_allocation import DiscreteAllocation, get_latest_prices
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance):
     my_portfolio = pd.DataFrame()
     for asset in selected_assets:
-        my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date)['Adj Close']
+        my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date,auto_adjust=False)['Adj Close']
 
     my_portfolio_returns = my_portfolio.pct_change().dropna()
     mu = expected_returns.mean_historical_return(my_portfolio)
