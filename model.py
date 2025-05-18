@@ -5,10 +5,17 @@ from sklearn.linear_model import LinearRegression
 from scipy.optimize import minimize
 
 def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, risk_tolerance):
-    # Download historical data
-    my_portfolio = pd.DataFrame()
-    for asset in selected_assets:
-        my_portfolio[asset] = yf.download(asset, start=start_date, end=end_date,auto_adjust=False)['Adj Close']
+    # Download historical data - updated for current yfinance API
+    data = yf.download(tickers=selected_assets, start=start_date, end=end_date, auto_adjust=False)
+    
+    # Handle data structure based on number of assets
+    if len(selected_assets) == 1:
+        my_portfolio = pd.DataFrame({selected_assets[0]: data['Adj Close']})
+    else:
+        my_portfolio = data['Adj Close']
+    
+    # Fill any missing values
+    my_portfolio = my_portfolio.fillna(method='ffill').fillna(method='bfill')
     
     # Calculate daily returns
     my_portfolio_returns = my_portfolio.pct_change().dropna()
@@ -36,6 +43,9 @@ def optimize_portfolio(selected_assets, start_date, end_date, portfolio_amount, 
 
     # Compute exponentially weighted covariance matrix for better risk estimation
     cov_matrix = my_portfolio_returns.ewm(span=60).cov().dropna().iloc[-len(selected_assets):, -len(selected_assets):] * 252  # Annualized covariance
+
+    # Ensure matrix is symmetric (fix for potential symmetry errors)
+    cov_matrix = (cov_matrix + cov_matrix.T) / 2
 
     num_assets = len(selected_assets)
     risk_free_rate = 0.02  # Assume a 2% annual risk-free rate
